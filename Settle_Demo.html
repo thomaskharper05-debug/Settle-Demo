@@ -1,0 +1,1656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Settle. — Document Intelligence Demo</title>
+<style>
+  body { margin: 0; padding: 0; font-family: -apple-system, sans-serif; }
+  #root { min-height: 100vh; }
+</style>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+/* ═══ DESIGN TOKENS ═══ */
+const TH = {
+  light: {
+    bg:"#F6F5F1",sf:"#FFFFFF",raised:"#FFFFFF",hover:"#F0EFEB",inset:"#EDECE8",
+    bd:"#DDD9D1",bdL:"#E8E6E0",h:"#1A1A18",t:"#3D3D3A",t2:"#6B6B66",t3:"#9C9C96",
+    ac:"#1A7A5C",acBg:"#E8F5EF",acBd:"#B8DFD0",acT:"#146B50",
+    gn:"#2D8A4E",gnBg:"#EBF7EF",gnBd:"#B4DFC3",
+    or:"#B85C1E",orBg:"#FFF3E8",orBd:"#F0C9A0",
+    rd:"#C53030",rdBg:"#FFF5F5",rdBd:"#FEB2B2",
+    bl:"#2B6CB0",blBg:"#EBF8FF",blBd:"#BEE3F8",
+    sh:"#1A7A5C",shBg:"#E8F5EF",shBd:"#B8DFD0",
+    cs:"0 1px 3px rgba(0,0,0,0.04),0 4px 12px rgba(0,0,0,0.03)",
+  },
+  dark: {
+    bg:"#161615",sf:"#1E1E1C",raised:"#262624",hover:"#2C2C29",inset:"#131312",
+    bd:"#353532",bdL:"#2A2A27",h:"#F0EFEB",t:"#C8C7C1",t2:"#8E8E88",t3:"#5E5E58",
+    ac:"#3DB88A",acBg:"#1A2E24",acBd:"#2A4A38",acT:"#3DB88A",
+    gn:"#4EBB78",gnBg:"#1A2E20",gnBd:"#2A4A32",
+    or:"#E8923E",orBg:"#2E2418",orBd:"#4A3822",
+    rd:"#FC8181",rdBg:"#2E1818",rdBd:"#4A2222",
+    bl:"#63B3ED",blBg:"#1A2A40",blBd:"#2A4A6B",
+    sh:"#3DB88A",shBg:"#1A2E24",shBd:"#2A4A38",
+    cs:"0 1px 4px rgba(0,0,0,0.2),0 6px 20px rgba(0,0,0,0.15)",
+  },
+};
+
+/* ═══ MOCK DATA — comprehensive ═══ */
+const PROCESSED_DOCS = [
+  { id: 1, orig: "scan_00341.pdf", name: "AcmeSupply_2026-03-05_Invoice_PO-2847.pdf", folder: "Invoices/AcmeSupply/", type: "Invoice", conf: 98, meta: { vendor:"Acme Supply Co.", date:"2026-03-05", amount:"$4,280.00", po:"PO-2847", payment_terms:"Net 60" }, uploadedBy: "You", uploadedAt: "Mar 5, 3:42 PM", version: "original", versions: ["original"], status: "filed", retention: "7 years", retentionExpiry: "2033-03-05", linked: [2], flags: [], approvalStatus: "auto-approved" },
+  { id: 2, orig: "PO_4505435063.pdf", name: "PrimaryProducts_PO-4505435063_2026-03-05.pdf", folder: "PurchaseOrders/PrimaryProducts/", type: "Purchase Order", conf: 99, meta: { buyer:"CB Manufacturing (PepsiCo)", vendor:"Primary Products Investments LLC", po_number:"4505435063", date:"2026-03-05", item:"HFCS CLE VLQ", quantity:"53,000 LB", delivery:"2026-03-09", ship_to:"200 Pepsi Way, Wytheville VA", payment_terms:"Net 60 days" }, uploadedBy: "You", uploadedAt: "Mar 5, 3:38 PM", version: "original", versions: ["original"], status: "filed", retention: "7 years", retentionExpiry: "2033-03-05", linked: [1], flags: [], approvalStatus: "auto-approved" },
+  { id: 3, orig: "IMG_2847.jpg", name: "Smith_Jane_2026-03-04_LabResult.pdf", folder: "Patients/Smith_Jane/Labs/", type: "Lab Result", conf: 96, meta: { patient:"Jane Smith", date:"2026-03-04", provider:"Quest Diagnostics", test:"CBC Panel" }, uploadedBy: "Sarah M.", uploadedAt: "Mar 4, 10:15 AM", version: "original", versions: ["original"], status: "filed", retention: "10 years", retentionExpiry: "2036-03-04", linked: [5], flags: [], approvalStatus: "auto-approved" },
+  { id: 4, orig: "contract_draft_v2.pdf", name: "AcmeCorp_SmithLLC_ServiceAgreement_2026-03-01.pdf", folder: "Contracts/Active/", type: "Contract", conf: 99, meta: { parties:"Acme Corp / Smith LLC", date:"2026-03-01", type:"Service Agreement", expiry:"2027-03-01" }, uploadedBy: "You", uploadedAt: "Mar 1, 2:20 PM", version: "revised", versions: ["original", "revised"], status: "pending_signature", retention: "10 years", retentionExpiry: "2036-03-01", linked: [], flags: ["needs_signature"], approvalStatus: "pending" },
+  { id: 5, orig: "fax_032.pdf", name: "Smith_Jane_2026-03-05_Referral.pdf", folder: "Patients/Smith_Jane/Referrals/", type: "Referral Letter", conf: 94, meta: { patient:"Jane Smith", referring:"Dr. Thompson", date:"2026-03-05", specialty:"Cardiology" }, uploadedBy: "You", uploadedAt: "Mar 5, 11:30 AM", version: "original", versions: ["original"], status: "filed", retention: "10 years", retentionExpiry: "2036-03-05", linked: [3], flags: [], approvalStatus: "auto-approved" },
+  { id: 6, orig: "invoice_grainger_march.pdf", name: "Grainger_2026-03-03_Invoice_INV-44892.pdf", folder: "Invoices/Grainger/", type: "Invoice", conf: 97, meta: { vendor:"Grainger", date:"2026-03-03", amount:"$8,741.00", invoice_no:"INV-44892" }, uploadedBy: "You", uploadedAt: "Mar 3, 4:10 PM", version: "original", versions: ["original"], status: "pending_approval", retention: "7 years", retentionExpiry: "2033-03-03", linked: [], flags: ["amount_over_5000"], approvalStatus: "needs_approval" },
+  { id: 7, orig: "scan_mixed_batch.pdf", name: "SPLIT_NEEDED_scan_mixed_batch.pdf", folder: "Review/", type: "Mixed Packet", conf: 62, meta: { pages:"14", detected_docs:"3-4 documents detected" }, uploadedBy: "Sarah M.", uploadedAt: "Mar 5, 2:00 PM", version: "original", versions: ["original"], status: "needs_review", retention: "", linked: [], flags: ["low_confidence", "needs_splitting"], approvalStatus: "pending" },
+  { id: 8, orig: "insurance_card_front.jpg", name: "Garcia_Maria_InsuranceCard_2026-03-05.pdf", folder: "Patients/Garcia_Maria/Insurance/", type: "Insurance Card", conf: 88, meta: { patient:"Maria Garcia", insurer:"Blue Cross", member_id:"XYZ-998877" }, uploadedBy: "You", uploadedAt: "Mar 5, 9:45 AM", version: "original", versions: ["original"], status: "needs_review", retention: "3 years", linked: [], flags: ["missing_back_side"], approvalStatus: "pending" },
+  { id: 9, orig: "receipt_sysco_0305.jpg", name: "Sysco_2026-03-05_Receipt_DEL-88421.pdf", folder: "Receipts/Sysco/", type: "Delivery Receipt", conf: 94, meta: { vendor:"Sysco Foods", date:"2026-03-05", total:"$2,847.33", delivery_no:"DEL-88421", items:"47 line items", payment:"Net 30" }, uploadedBy: "You", uploadedAt: "Mar 5, 7:20 AM", version: "original", versions: ["original"], status: "filed", retention: "7 years", retentionExpiry: "2033-03-05", linked: [], flags: [], approvalStatus: "auto-approved" },
+  { id: 10, orig: "IMG_4411.jpg", name: "DailySalesReport_2026-03-04_Handwritten.pdf", folder: "DailyReports/March2026/", type: "Daily Sales Report", conf: 82, meta: { date:"2026-03-04", total_sales:"$6,412", cash:"$1,847", credit:"$4,565", covers:"187", notes:"Handwritten — 82% legible" }, uploadedBy: "Manager", uploadedAt: "Mar 4, 11:55 PM", version: "original", versions: ["original"], status: "filed", retention: "3 years", retentionExpiry: "2029-03-04", linked: [], flags: [], approvalStatus: "auto-approved" },
+  { id: 11, orig: "health_inspection_2026.pdf", name: "HealthInspection_2026-02-28_Score97.pdf", folder: "Compliance/HealthInspections/", type: "Health Inspection Report", conf: 99, meta: { inspector:"County Health Dept", date:"2026-02-28", score:"97/100", violations:"1 minor", next_inspection:"2026-08-28", location:"Main Street Kitchen" }, uploadedBy: "You", uploadedAt: "Mar 1, 9:00 AM", version: "original", versions: ["original"], status: "filed", retention: "Permanent", retentionExpiry: "Permanent", linked: [], flags: [], approvalStatus: "auto-approved" },
+  { id: 12, orig: "tip_report_week9.jpg", name: "TipReport_2026-03-01_Week9.pdf", folder: "Payroll/TipReports/", type: "Tip Report", conf: 86, meta: { period:"Week 9, 2026", total_tips:"$4,211", employees:"12", handwritten:"Yes — partially", avg_per_server:"$351" }, uploadedBy: "Sarah M.", uploadedAt: "Mar 3, 10:00 AM", version: "original", versions: ["original"], status: "filed", retention: "4 years", retentionExpiry: "2030-03-03", linked: [], flags: [], approvalStatus: "auto-approved" },
+  { id: 13, orig: "thermal_receipt_002.jpg", name: "USFoods_2026-03-04_Receipt_R-44102.pdf", folder: "Receipts/USFoods/", type: "Receipt", conf: 79, meta: { vendor:"US Foods", date:"2026-03-04", total:"$1,203.88", items:"23 items", payment:"Credit card ending 4421" }, uploadedBy: "You", uploadedAt: "Mar 4, 3:15 PM", version: "original", versions: ["original"], status: "needs_review", retention: "7 years", linked: [], flags: ["low_confidence"], approvalStatus: "pending" },
+];
+
+/* ═══ ENTITY INDEX — every person, company, address, reference ═══ */
+const ENTITIES = [
+  { id:"e1", type:"person", name:"Jeamy Williams", role:"Procurement / Issuer", company:"PepsiCo / CB Manufacturing", docs:[2], meta:{email:"Jeamy.Williams@pepsico.com",title:"Purchasing Agent"} },
+  { id:"e2", type:"company", name:"PepsiCo", aka:["CB Manufacturing Co. Inc.","CB Manufacturing (PepsiCo)","PepsiCo NASS"], docs:[2], meta:{address:"200 Pepsi Way, Wytheville VA 24382",type:"Buyer / Manufacturer"} },
+  { id:"e3", type:"company", name:"Primary Products Investments LLC", aka:["Primary Products"], docs:[2], meta:{vendor_no:"2000208161",address:"5450 Prairie Stone Pkwy, Ste 170, Hoffman Estates IL 60192",phone:"7636072850"} },
+  { id:"e4", type:"company", name:"Acme Supply Co.", aka:["Acme Supply","AcmeSupply"], docs:[1,4], meta:{type:"Vendor"} },
+  { id:"e5", type:"person", name:"Jane Smith", role:"Patient", docs:[3,5], meta:{} },
+  { id:"e6", type:"person", name:"Dr. Thompson", role:"Referring Physician", docs:[5], meta:{specialty:"Cardiology"} },
+  { id:"e7", type:"company", name:"Quest Diagnostics", docs:[3], meta:{type:"Lab Provider"} },
+  { id:"e8", type:"company", name:"Grainger", docs:[6], meta:{type:"Vendor / Supplier"} },
+  { id:"e9", type:"person", name:"Maria Garcia", role:"Patient", docs:[8], meta:{insurer:"Blue Cross",member_id:"XYZ-998877"} },
+  { id:"e10", type:"company", name:"Sysco Foods", aka:["Sysco"], docs:[9], meta:{type:"Food Distributor"} },
+  { id:"e11", type:"company", name:"US Foods", docs:[13], meta:{type:"Food Distributor"} },
+  { id:"e12", type:"company", name:"Blue Cross", aka:["Blue Cross Blue Shield"], docs:[8], meta:{type:"Insurance"} },
+  { id:"e13", type:"person", name:"Robert Chen", role:"Claimant", docs:[], meta:{claim:"CLM-99201"} },
+  { id:"e14", type:"company", name:"State Farm", docs:[], meta:{type:"Insurance"} },
+  { id:"e15", type:"company", name:"Smith LLC", docs:[4], meta:{type:"Client"} },
+  { id:"e16", type:"company", name:"Acme Corp", docs:[4], meta:{type:"Client / Counterparty"} },
+  { id:"e17", type:"location", name:"200 Pepsi Way, Wytheville VA", docs:[2], meta:{type:"Ship-to address"} },
+  { id:"e18", type:"location", name:"Main Street Kitchen", docs:[11], meta:{type:"Business location"} },
+  { id:"e19", type:"reference", name:"PO-4505435063", docs:[2], meta:{type:"Purchase Order Number"} },
+  { id:"e20", type:"reference", name:"PO-2847", docs:[1], meta:{type:"Purchase Order Number"} },
+  { id:"e21", type:"reference", name:"INV-44892", docs:[6], meta:{type:"Invoice Number"} },
+  { id:"e22", type:"reference", name:"CLM-99201", docs:[], meta:{type:"Claim Number"} },
+  { id:"e23", type:"reference", name:"DEL-88421", docs:[9], meta:{type:"Delivery Number"} },
+  { id:"e24", type:"person", name:"Sarah M.", role:"Staff Member", docs:[3,7,12], meta:{role:"Staff",access:"Patients/ only"} },
+  { id:"e25", type:"company", name:"County Health Dept", docs:[11], meta:{type:"Government Agency"} },
+];
+
+const AUDIT_LOG = [
+  { time: "3:42 PM", action: "Document uploaded & encrypted", file: "scan_00341.pdf", user: "You", icon: "🔒", detail: "AES-256 encrypted, 2.4 MB" },
+  { time: "3:42 PM", action: "AI classified as Invoice (98%)", file: "scan_00341.pdf", user: "System", icon: "🧠", detail: "Vendor: Acme Supply, Amount: $4,280" },
+  { time: "3:42 PM", action: "Auto-renamed & filed", file: "→ AcmeSupply_2026-03-05_Invoice_PO-2847.pdf", user: "System", icon: "📁", detail: "Invoices/AcmeSupply/" },
+  { time: "3:42 PM", action: "Linked to Purchase Order", file: "PO-4505435063", user: "System", icon: "🔗", detail: "Matched on vendor + amount" },
+  { time: "3:38 PM", action: "Document uploaded & encrypted", file: "PO_4505435063.pdf", user: "You", icon: "🔒", detail: "AES-256 encrypted, 890 KB" },
+  { time: "3:38 PM", action: "AI classified as Purchase Order (99%)", file: "PO_4505435063.pdf", user: "System", icon: "🧠", detail: "PO #4505435063, Vendor: Primary Products" },
+  { time: "2:00 PM", action: "Low confidence — flagged for review", file: "scan_mixed_batch.pdf", user: "System", icon: "⚠️", detail: "62% confidence, packet splitting needed" },
+  { time: "11:30 AM", action: "Correction applied — learned", file: "fax_032.pdf", user: "You", icon: "✏️", detail: 'Type changed from "Letter" to "Referral Letter" — system will remember' },
+  { time: "10:15 AM", action: "Document uploaded by team member", file: "IMG_2847.jpg", user: "Sarah M. (Staff)", icon: "👤", detail: "Role: Staff, scope: Patients/" },
+  { time: "9:45 AM", action: "Missing back side detected", file: "insurance_card_front.jpg", user: "System", icon: "⚠️", detail: "Insurance card — back side needed for complete record" },
+  { time: "7:20 AM", action: "Delivery receipt processed", file: "receipt_sysco_0305.jpg", user: "System", icon: "🧾", detail: "Sysco, $2,847.33, 47 line items extracted" },
+  { time: "Mar 4, 11:55 PM", action: "Handwriting detected & transcribed", file: "IMG_4411.jpg", user: "System", icon: "✍️", detail: "Daily sales report — 82% legibility, key figures extracted" },
+  { time: "Mar 4, 3:15 PM", action: "Low confidence — faded thermal receipt", file: "thermal_receipt_002.jpg", user: "System", icon: "⚠️", detail: "79% confidence — partial fade, recommend re-scan or manual verify" },
+];
+
+const RULES = [
+  { id: 1, active: true, condition: 'If vendor = "Grainger"', action: "Route to AP/Grainger/", type: "routing" },
+  { id: 2, active: true, condition: "If amount > $5,000", action: "Flag for manager approval", type: "approval" },
+  { id: 3, active: true, condition: "If type = Insurance Card", action: "Attach to patient intake folder", type: "routing" },
+  { id: 4, active: true, condition: "If confidence < 80%", action: "Route to review queue", type: "exception" },
+  { id: 5, active: false, condition: 'If location = "Knoxville"', action: "Route to Knoxville branch folder", type: "routing" },
+  { id: 6, active: true, condition: "If type = Contract AND no signature detected", action: "Flag: needs signature", type: "exception" },
+  { id: 7, active: true, condition: "If type = Receipt AND vendor = Sysco or US Foods", action: "Route to AP/Food Vendors/ and match to delivery ticket", type: "routing" },
+  { id: 8, active: true, condition: "If type = Tip Report", action: "Route to Payroll/TipReports/ and flag for manager verification", type: "approval" },
+  { id: 9, active: true, condition: "If type = Health Inspection", action: "Route to Compliance/ and notify owner immediately", type: "exception" },
+  { id: 10, active: true, condition: "If contains_handwriting = true AND confidence < 85%", action: "Route to review queue for manual verification", type: "exception" },
+  { id: 11, active: true, condition: "If type = Daily Sales Report", action: "Route to DailyReports/{Month}/ and flag if total differs > 10% from average", type: "routing" },
+];
+
+const USERS = [
+  { id: "USR-001", name: "You", role: "Owner", email: "owner@company.com", access: "Full access", lastActive: "Now", docs: 142, joined: "Jan 15, 2026", phone: "540-555-0101",
+    permissions: { upload:true, view_all:true, edit:true, delete:true, approve:true, manage_users:true, manage_rules:true, manage_billing:true, export:true, audit_view:true, settings:true },
+    folderAccess: "all",
+    recentActivity: [
+      { action:"Uploaded document", file:"PO_4505435063.pdf", time:"3:38 PM" },
+      { action:"Approved invoice", file:"AcmeSupply_Invoice.pdf", time:"3:42 PM" },
+      { action:"Changed rule", file:"Amount > $5K threshold", time:"2:15 PM" },
+      { action:"Invited team member", file:"accounting@company.com", time:"Yesterday" },
+    ],
+    taggedDocs: [1,2,4,6,8,9,10,11,13],
+  },
+  { id: "USR-002", name: "Sarah M.", role: "Staff", email: "sarah@company.com", access: "Patients/ only", lastActive: "2 hrs ago", docs: 38, joined: "Feb 3, 2026", phone: "540-555-0202",
+    permissions: { upload:true, view_all:false, edit:false, delete:false, approve:false, manage_users:false, manage_rules:false, manage_billing:false, export:false, audit_view:false, settings:false },
+    folderAccess: "Patients/",
+    recentActivity: [
+      { action:"Uploaded document", file:"IMG_2847.jpg", time:"10:15 AM" },
+      { action:"Uploaded document", file:"scan_mixed_batch.pdf", time:"2:00 PM" },
+      { action:"Uploaded tip report", file:"tip_report_week9.jpg", time:"Mar 3, 10:00 AM" },
+    ],
+    taggedDocs: [3,7,12],
+  },
+  { id: "USR-003", name: "James T.", role: "Manager", email: "james@company.com", access: "All folders", lastActive: "Yesterday", docs: 67, joined: "Jan 20, 2026", phone: "540-555-0303",
+    permissions: { upload:true, view_all:true, edit:true, delete:false, approve:true, manage_users:false, manage_rules:true, manage_billing:false, export:true, audit_view:true, settings:false },
+    folderAccess: "all",
+    recentActivity: [
+      { action:"Approved invoice", file:"Grainger_Invoice_INV-44892.pdf", time:"Yesterday" },
+      { action:"Corrected document type", file:"fax_032.pdf", time:"Yesterday" },
+      { action:"Exported audit log", file:"March_audit.csv", time:"Mar 2" },
+    ],
+    taggedDocs: [5,6,10],
+  },
+  { id: "USR-004", name: "Accounting Dept", role: "View-Only", email: "accounting@company.com", access: "Invoices/ & PurchaseOrders/ only", lastActive: "3 days ago", docs: 0, joined: "Mar 1, 2026", phone: "",
+    permissions: { upload:false, view_all:false, edit:false, delete:false, approve:false, manage_users:false, manage_rules:false, manage_billing:false, export:true, audit_view:false, settings:false },
+    folderAccess: "Invoices/, PurchaseOrders/",
+    recentActivity: [
+      { action:"Viewed document", file:"AcmeSupply_Invoice.pdf", time:"3 days ago" },
+      { action:"Exported report", file:"invoice_summary.csv", time:"3 days ago" },
+    ],
+    taggedDocs: [],
+  },
+];
+
+const TEMPLATES = [
+  { name: "AP / Invoices", types: 6, rules: 4, desc: "Invoice routing, approval thresholds, vendor folders" },
+  { name: "Medical Practice", types: 8, rules: 5, desc: "Patient records, insurance, labs, referrals, HIPAA retention" },
+  { name: "Auto Dealership", types: 10, rules: 6, desc: "Deal jackets, titles, ROs, FTC compliance" },
+  { name: "Legal Office", types: 7, rules: 4, desc: "Case files, discovery, court orders, retention schedules" },
+  { name: "Permits & Licensing", types: 5, rules: 3, desc: "Permits, inspections, certificates, renewal tracking" },
+  { name: "HR Documents", types: 6, rules: 4, desc: "Applications, onboarding, certifications, termination" },
+  { name: "Restaurant / Hospitality", types: 12, rules: 7, desc: "Receipts, delivery tickets, tip reports, health inspections, vendor invoices, daily sales, food safety, liquor licenses, handwritten notes" },
+  { name: "Construction / Field", types: 8, rules: 5, desc: "Permits, inspections, change orders, lien waivers, daily logs, handwritten field notes" },
+];
+
+/* ═══ ICONS ═══ */
+const Lock=({s=13,c})=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2.5" strokeLinecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>;
+const Shield=({s=15,c})=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2.5" strokeLinecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>;
+const Sun=({s=15,c})=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>;
+const Moon=({s=15,c})=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>;
+const Chk=({s=16,c})=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="3" strokeLinecap="round"><path d="M20 6L9 17l-5-5"/></svg>;
+const MI=({s=20,c})=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round"><path d="M3 12h18M3 6h18M3 18h18"/></svg>;
+const XI=({s=20,c})=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>;
+
+/* ═══ AI ANALYZER ═══ */
+async function analyzeDoc(b64, mtype, fname) {
+  // Simulated AI analysis for demo — real product uses live AI
+  await new Promise(r => setTimeout(r, 1500 + Math.random() * 1500));
+  
+  const fnL = fname.toLowerCase();
+  const isReceipt = fnL.includes("receipt") || fnL.includes("rcpt");
+  const isInvoice = fnL.includes("invoice") || fnL.includes("inv") || fnL.includes("bill");
+  const isPO = fnL.includes("po") || fnL.includes("purchase");
+  const isContract = fnL.includes("contract") || fnL.includes("agreement") || fnL.includes("lease");
+  const isLab = fnL.includes("lab") || fnL.includes("result") || fnL.includes("test");
+  const isInsurance = fnL.includes("insurance") || fnL.includes("eob") || fnL.includes("claim");
+  const isTax = fnL.includes("tax") || fnL.includes("w2") || fnL.includes("1099") || fnL.includes("w-2");
+  const isPermit = fnL.includes("permit") || fnL.includes("license") || fnL.includes("inspection");
+  const isHR = fnL.includes("hr") || fnL.includes("employee") || fnL.includes("application") || fnL.includes("onboard");
+  const isHealth = fnL.includes("health") || fnL.includes("safety") || fnL.includes("food");
+  const isTip = fnL.includes("tip") || fnL.includes("gratuity");
+  const isService = fnL.includes("repair") || fnL.includes("service") || fnL.includes("work order") || fnL.includes("ro");
+  const isTitle = fnL.includes("title") || fnL.includes("deed");
+  
+  let docType, conf, fields, sugName, sugFolder, summary, missing;
+  const today = new Date().toISOString().slice(0,10);
+  const fdate = today.replace(/-/g,"-");
+  
+  if (isPO) {
+    docType = "Purchase Order"; conf = 96;
+    fields = { vendor:"Vendor Corp", date:fdate, po_number:"PO-" + Math.floor(Math.random()*900000+100000), amount:"$" + (Math.random()*10000).toFixed(2), payment_terms:"Net 60", buyer:"Your Company", item:"Materials / Supplies", quantity:Math.floor(Math.random()*1000) + " units" };
+    sugName = fields.vendor.replace(/\s/g,"") + "_" + fdate + "_PurchaseOrder_" + fields.po_number + ".pdf";
+    sugFolder = "PurchaseOrders/" + fields.vendor.replace(/\s/g,"") + "/";
+    summary = "Purchase order from " + fields.vendor + " for " + fields.quantity + " at " + fields.amount;
+    missing = [];
+  } else if (isInvoice) {
+    docType = "Invoice"; conf = 97;
+    fields = { vendor:"Acme Vendor Inc.", date:fdate, invoice_no:"INV-" + Math.floor(Math.random()*90000+10000), amount:"$" + (Math.random()*8000+200).toFixed(2), payment_terms:"Net 30", due_date:"2026-04-05" };
+    sugName = fields.vendor.replace(/\s/g,"") + "_" + fdate + "_Invoice_" + fields.invoice_no + ".pdf";
+    sugFolder = "Invoices/" + fields.vendor.replace(/\s/g,"") + "/";
+    summary = "Invoice from " + fields.vendor + " for " + fields.amount + ", due " + fields.due_date;
+    missing = [];
+  } else if (isReceipt) {
+    docType = "Receipt"; conf = 89;
+    fields = { store:"Local Store", date:fdate, total:"$" + (Math.random()*500+10).toFixed(2), payment:"Credit card", items:Math.floor(Math.random()*20+1) + " items" };
+    sugName = fields.store.replace(/\s/g,"") + "_" + fdate + "_Receipt.pdf";
+    sugFolder = "Receipts/" + fields.store.replace(/\s/g,"") + "/";
+    summary = "Receipt from " + fields.store + " for " + fields.total;
+    missing = Math.random() > 0.5 ? ["Some line items partially illegible"] : [];
+  } else if (isContract) {
+    docType = "Contract"; conf = 95;
+    fields = { parties:"Party A / Party B", date:fdate, type:"Service Agreement", expiry:"2027-03-01", signed:"No" };
+    sugName = "PartyA_PartyB_ServiceAgreement_" + fdate + ".pdf";
+    sugFolder = "Contracts/Active/";
+    summary = "Service agreement between Party A and Party B, expires 2027-03-01.";
+    missing = ["No signature detected"];
+  } else if (isLab) {
+    docType = "Lab Result"; conf = 93;
+    fields = { patient:"Patient Name", date:fdate, provider:"Quest Diagnostics", test:"Standard Panel" };
+    sugName = "Patient_" + fdate + "_LabResult.pdf";
+    sugFolder = "Patients/Patient_Name/Labs/";
+    summary = "Lab result from Quest Diagnostics for standard panel.";
+    missing = [];
+  } else if (isInsurance) {
+    docType = "Insurance Document"; conf = 91;
+    fields = { patient_or_claimant:"Name on file", insurer:"Insurance Co.", date:fdate, policy:"POL-" + Math.floor(Math.random()*900000+100000) };
+    sugName = "InsuranceCo_" + fdate + "_Claim.pdf";
+    sugFolder = "Insurance/Claims/";
+    summary = "Insurance document from Insurance Co.";
+    missing = [];
+  } else if (isTax) {
+    docType = "Tax Document"; conf = 94;
+    fields = { form_type:"Tax Form", tax_year:"2025", date:fdate };
+    sugName = "TaxForm_2025_" + fdate + ".pdf";
+    sugFolder = "Tax/2025/";
+    summary = "Tax document for tax year 2025.";
+    missing = [];
+  } else if (isPermit) {
+    docType = "Permit"; conf = 92;
+    fields = { permit_no:"PMT-" + Math.floor(Math.random()*9000+1000), issued:fdate, type:"General Permit" };
+    sugName = "Permit_" + fields.permit_no + "_" + fdate + ".pdf";
+    sugFolder = "Permits/Active/";
+    summary = "Permit " + fields.permit_no + " issued " + fdate;
+    missing = [];
+  } else if (isHealth) {
+    docType = "Health/Safety Document"; conf = 90;
+    fields = { type:"Inspection/Safety Log", date:fdate, location:"Primary Location" };
+    sugName = "HealthSafety_" + fdate + ".pdf";
+    sugFolder = "Compliance/HealthSafety/";
+    summary = "Health and safety document dated " + fdate;
+    missing = [];
+  } else if (isTip) {
+    docType = "Tip Report"; conf = 84;
+    fields = { period:"Current Period", total_tips:"$" + (Math.random()*3000+500).toFixed(2), employees:Math.floor(Math.random()*10+3), handwritten:"Possibly" };
+    sugName = "TipReport_" + fdate + ".pdf";
+    sugFolder = "Payroll/TipReports/";
+    summary = "Tip report for current period.";
+    missing = [];
+  } else if (isService) {
+    docType = "Repair/Service Order"; conf = 93;
+    fields = { customer:"Customer Name", date:fdate, ro_number:"RO-" + Math.floor(Math.random()*9000+1000), service:"Service Performed" };
+    sugName = "Customer_" + fields.ro_number + "_" + fdate + ".pdf";
+    sugFolder = "Service/RepairOrders/";
+    summary = "Repair order " + fields.ro_number + " for Customer Name.";
+    missing = [];
+  } else if (isTitle) {
+    docType = "Title/Deed"; conf = 91;
+    fields = { type:"Title Document", date:fdate, reference:"REF-" + Math.floor(Math.random()*90000+10000) };
+    sugName = "Title_" + fields.reference + "_" + fdate + ".pdf";
+    sugFolder = "Titles/";
+    summary = "Title document dated " + fdate;
+    missing = [];
+  } else {
+    // Generic - analyze filename for clues
+    docType = "Document"; conf = 85;
+    const cleanName = fname.replace(/[._-]/g, " ").replace(/\.(pdf|jpg|jpeg|png|tiff?)$/i, "");
+    fields = { filename:fname, date:fdate, type:"Unclassified", size:Math.floor(Math.random()*5000+100) + " KB" };
+    sugName = cleanName.replace(/\s+/g,"_") + "_" + fdate + ".pdf";
+    sugFolder = "Documents/Unsorted/";
+    summary = "Document uploaded on " + fdate + ". Classification based on content analysis.";
+    missing = [];
+  }
+  
+  const hasHandwriting = fnL.includes("handwrit") || fnL.includes("note") || fnL.includes("written") || Math.random() > 0.85;
+  
+  return {
+    document_type: docType,
+    confidence: conf,
+    extracted_fields: fields,
+    suggested_filename: sugName,
+    suggested_folder: sugFolder,
+    summary: summary,
+    missing_info: missing,
+    version_hint: fnL.includes("v2") || fnL.includes("revised") || fnL.includes("final") || fnL.includes("signed") ? 
+      (fnL.includes("final") ? "final" : fnL.includes("signed") ? "signed" : "revised") : "original",
+    contains_handwriting: hasHandwriting,
+    handwriting_confidence: hasHandwriting ? (Math.random() > 0.5 ? "medium" : "high") : null,
+    scan_quality: Math.random() > 0.8 ? "fair" : "good",
+  };
+}
+
+function readB64(file) {
+  return new Promise((res,rej)=>{
+    const r=new FileReader();
+    r.onload=()=>{const d=r.result.split(",")[1]; d?res(d):rej(new Error("encode fail"))};
+    r.onerror=()=>rej(new Error("read fail"));
+    r.readAsDataURL(file);
+  });
+}
+
+/* ═══ MAIN ═══ */
+function App() {
+  const [mode,setMode]=useState(()=>window.matchMedia?.("(prefers-color-scheme:dark)").matches?"dark":"light");
+  const C=TH[mode];
+  useEffect(()=>{const m=window.matchMedia("(prefers-color-scheme:dark)");const h=e=>setMode(e.matches?"dark":"light");m.addEventListener("change",h);return()=>m.removeEventListener("change",h)},[]);
+
+  const [nav,setNav]=useState("dashboard");
+  const [menuOpen,setMenuOpen]=useState(false);
+  const [uploads,setUploads]=useState([]);
+  const [selectedDoc,setSelectedDoc]=useState(null);
+  const [selectedUser,setSelectedUser]=useState(null);
+  const [nlQuery,setNlQuery]=useState("");
+  const [nlResults,setNlResults]=useState(null);
+  const [entityResults,setEntityResults]=useState(null);
+  const [selectedEntity,setSelectedEntity]=useState(null);
+  const fileRef=useRef(null);
+
+  /* ═══ FEATURE TOGGLES ═══ */
+  const [features,setFeatures]=useState({
+    // Core — always on, can't disable
+    core_upload:true, core_ai:true, core_naming:true, core_search:true, core_encryption:true,
+    // Modules — toggleable
+    approval_workflows:true, rules_engine:true, version_tracking:true, duplicate_detection:true,
+    retention_rules:true, audit_trail:true, team_roles:true, templates:true,
+    // Document capabilities — toggle by relevance
+    handwriting_recognition:true, receipt_scanning:true, multi_page_splitting:true,
+    missing_info_detection:true, cross_doc_linking:true,
+    // Industry-specific doc types
+    dt_invoices:true, dt_purchase_orders:true, dt_receipts:true, dt_contracts:true,
+    dt_patient_records:false, dt_insurance:false, dt_lab_results:false, dt_referrals:false,
+    dt_repair_orders:false, dt_titles:false,
+    dt_permits:false, dt_inspections:false,
+    dt_legal:false, dt_court_orders:false,
+    dt_health_inspections:false, dt_tip_reports:false, dt_food_safety:false, dt_daily_sales:false,
+    dt_liquor_license:false, dt_delivery_tickets:false, dt_catering:false,
+    dt_hr:true, dt_tax:true, dt_correspondence:true,
+    // Ingestion sources
+    ing_email:true, ing_watched_folder:false, ing_scanner:false, ing_pos:false,
+    ing_sftp:false, ing_desktop:false, ing_mobile_camera:true,
+  });
+
+  const FEATURE_GROUPS = [
+    { id:"core", label:"Core Features", desc:"Always on. The foundation.", locked:true, items:[
+      {key:"core_upload",label:"Document Upload & Processing"},
+      {key:"core_ai",label:"AI Classification & Extraction"},
+      {key:"core_naming",label:"Auto-Naming & Sorting"},
+      {key:"core_search",label:"Search"},
+      {key:"core_encryption",label:"Encryption (AES-256 + TLS 1.3)"},
+    ]},
+    { id:"modules", label:"Product Modules", desc:"Toggle entire feature areas on or off.", items:[
+      {key:"approval_workflows",label:"Approval & Exception Workflows",desc:"Route docs for approval, flag exceptions"},
+      {key:"rules_engine",label:"Rules Engine",desc:"If/then routing, thresholds, auto-actions"},
+      {key:"version_tracking",label:"Version Tracking",desc:"Original → revised → final → signed chain"},
+      {key:"duplicate_detection",label:"Duplicate Detection",desc:"Catch exact and near-duplicate uploads"},
+      {key:"retention_rules",label:"Retention & Archival",desc:"Time-based retention, legal hold, auto-archive"},
+      {key:"audit_trail",label:"Audit Trail",desc:"Immutable log of every action, exportable"},
+      {key:"team_roles",label:"Team & Role Management",desc:"Admin, Manager, Staff, View-Only permissions"},
+      {key:"templates",label:"Templates & Playbooks",desc:"Pre-built industry setups"},
+      {key:"cross_doc_linking",label:"Cross-Document Linking",desc:"Link invoices to POs, referrals to records"},
+    ]},
+    { id:"capabilities", label:"AI Capabilities", desc:"Special detection features.", items:[
+      {key:"handwriting_recognition",label:"Handwriting Recognition",desc:"Read and transcribe handwritten docs"},
+      {key:"receipt_scanning",label:"Receipt & Thermal Paper Scanning",desc:"Read faded receipts, POS printouts"},
+      {key:"multi_page_splitting",label:"Multi-Page Packet Splitting",desc:"Split mixed scans into individual docs"},
+      {key:"missing_info_detection",label:"Missing Information Detection",desc:"Catch missing signatures, pages, dates"},
+    ]},
+    { id:"medical", label:"Medical / Healthcare", desc:"Patient records, labs, insurance, referrals.", items:[
+      {key:"dt_patient_records",label:"Patient Records"},{key:"dt_insurance",label:"Insurance Cards & EOBs"},
+      {key:"dt_lab_results",label:"Lab Results"},{key:"dt_referrals",label:"Referral Letters"},
+    ]},
+    { id:"automotive", label:"Automotive / Dealership", desc:"Titles, repair orders, deal jackets.", items:[
+      {key:"dt_repair_orders",label:"Repair Orders & Service"},{key:"dt_titles",label:"Titles & Vehicle Docs"},
+    ]},
+    { id:"restaurant", label:"Restaurant / Hospitality", desc:"Receipts, tips, inspections, food safety.", items:[
+      {key:"dt_health_inspections",label:"Health Inspections"},{key:"dt_tip_reports",label:"Tip Reports"},
+      {key:"dt_food_safety",label:"Food Safety Logs"},{key:"dt_daily_sales",label:"Daily Sales Reports"},
+      {key:"dt_liquor_license",label:"Liquor Licenses"},{key:"dt_delivery_tickets",label:"Delivery Tickets"},
+      {key:"dt_catering",label:"Catering Orders"},
+    ]},
+    { id:"legal", label:"Legal", desc:"Case files, court orders, filings.", items:[
+      {key:"dt_legal",label:"Legal Documents"},{key:"dt_court_orders",label:"Court Orders & Filings"},
+    ]},
+    { id:"govpermit", label:"Government / Permits", desc:"Permits, inspections, licensing.", items:[
+      {key:"dt_permits",label:"Permits"},{key:"dt_inspections",label:"Inspection Reports"},
+    ]},
+    { id:"ingestion", label:"Ingestion Sources", desc:"How documents enter the system.", items:[
+      {key:"ing_email",label:"Email Forwarding",desc:"scan@yourbiz.settle.app"},
+      {key:"ing_watched_folder",label:"Watched Folder",desc:"Auto-process from local/network folder"},
+      {key:"ing_scanner",label:"Scanner Drop Folder",desc:"Connect physical scanner directly"},
+      {key:"ing_pos",label:"POS Receipt Import",desc:"Square, Toast, Clover integration"},
+      {key:"ing_sftp",label:"SFTP Endpoint",desc:"Automated vendor/distributor delivery"},
+      {key:"ing_desktop",label:"Desktop Agent",desc:"Background sync from any folder"},
+      {key:"ing_mobile_camera",label:"Mobile Camera Capture",desc:"Snap and process from phone"},
+    ]},
+  ];
+
+  const toggleFeature = (key) => {
+    setFeatures(prev => ({...prev, [key]: !prev[key]}));
+  };
+
+  const applyPreset = (preset) => {
+    const base = {...features};
+    // Turn off all industry-specific first
+    Object.keys(base).filter(k=>k.startsWith("dt_")).forEach(k=>{base[k]=false});
+    Object.keys(base).filter(k=>k.startsWith("ing_")).forEach(k=>{base[k]=false});
+    base.ing_email=true; base.ing_mobile_camera=true;
+    // Apply preset
+    if(preset==="medical"){
+      base.dt_patient_records=true;base.dt_insurance=true;base.dt_lab_results=true;base.dt_referrals=true;
+      base.dt_invoices=true;base.dt_contracts=true;base.dt_hr=true;base.dt_correspondence=true;
+      base.approval_workflows=true;base.retention_rules=true;base.audit_trail=true;base.team_roles=true;
+      base.missing_info_detection=true;base.cross_doc_linking=true;
+    } else if(preset==="restaurant"){
+      base.dt_receipts=true;base.dt_delivery_tickets=true;base.dt_health_inspections=true;
+      base.dt_tip_reports=true;base.dt_food_safety=true;base.dt_daily_sales=true;
+      base.dt_liquor_license=true;base.dt_catering=true;base.dt_invoices=true;base.dt_hr=true;
+      base.receipt_scanning=true;base.handwriting_recognition=true;base.ing_pos=true;
+    } else if(preset==="dealership"){
+      base.dt_repair_orders=true;base.dt_titles=true;base.dt_invoices=true;base.dt_purchase_orders=true;
+      base.dt_contracts=true;base.dt_insurance=true;base.dt_hr=true;base.dt_correspondence=true;
+      base.multi_page_splitting=true;base.ing_scanner=true;
+    } else if(preset==="legal"){
+      base.dt_legal=true;base.dt_court_orders=true;base.dt_contracts=true;
+      base.dt_correspondence=true;base.dt_invoices=true;base.dt_hr=true;
+      base.version_tracking=true;base.retention_rules=true;base.audit_trail=true;
+    } else if(preset==="government"){
+      base.dt_permits=true;base.dt_inspections=true;base.dt_contracts=true;
+      base.dt_correspondence=true;base.dt_invoices=true;base.dt_hr=true;
+      base.retention_rules=true;base.audit_trail=true;base.approval_workflows=true;
+    } else if(preset==="all"){
+      Object.keys(base).forEach(k=>{base[k]=true});
+    }
+    setFeatures(base);
+  };
+
+  // Filter sidebar items based on active features
+  const sidebarVisible = (id) => {
+    if(["dashboard","upload","files","search","security","settings"].includes(id)) return true;
+    if(id==="workflows") return features.approval_workflows;
+    if(id==="audit") return features.audit_trail;
+    if(id==="rules") return features.rules_engine;
+    if(id==="team") return features.team_roles;
+    if(id==="retention") return features.retention_rules;
+    if(id==="templates") return features.templates;
+    return true;
+  };
+  const go=id=>{setNav(id);setMenuOpen(false);setSelectedDoc(null);setSelectedUser(null)};
+  const ft="'Outfit',-apple-system,sans-serif";
+  const sf="'Source Serif 4',Georgia,serif";
+
+  const Badge=({children,c=C.acT,bg=C.acBg,style:s})=><span style={{display:"inline-block",padding:"3px 9px",borderRadius:5,fontSize:11,fontWeight:600,color:c,background:bg,...s}}>{children}</span>;
+  const Card=({children,style:s,...p})=><div style={{background:C.raised,borderRadius:14,border:`1px solid ${C.bd}`,boxShadow:C.cs,...s}} {...p}>{children}</div>;
+  const Spinner=()=><div style={{width:14,height:14,border:`2px solid ${C.ac}`,borderTopColor:"transparent",borderRadius:"50%",animation:"spin .7s linear infinite"}}/>;
+
+  const flagBadge=(flag)=>{
+    const map={
+      needs_signature:{label:"Needs Signature",c:C.or,bg:C.orBg},
+      amount_over_5000:{label:"Amount > $5K",c:C.or,bg:C.orBg},
+      low_confidence:{label:"Low Confidence",c:C.rd,bg:C.rdBg},
+      needs_splitting:{label:"Needs Splitting",c:C.rd,bg:C.rdBg},
+      missing_back_side:{label:"Missing Back Side",c:C.or,bg:C.orBg},
+      duplicate:{label:"Possible Duplicate",c:C.bl,bg:C.blBg},
+    };
+    const m=map[flag]||{label:flag,c:C.t2,bg:C.inset};
+    return <Badge c={m.c} bg={m.bg}>{m.label}</Badge>;
+  };
+
+  const processFiles=async(rawFiles)=>{
+    const arr=Array.from(rawFiles);
+    const startIdx=uploads.length;
+    const newEntries=arr.map(f=>({file:f,status:"encrypting",result:null,error:null,startTime:Date.now()}));
+    setUploads(p=>[...p,...newEntries]);
+    for(let i=0;i<arr.length;i++){
+      const file=arr[i],idx=startIdx+i;
+      await new Promise(r=>setTimeout(r,500));
+      setUploads(p=>p.map((e,j)=>j===idx?{...e,status:"reading"}:e));
+      try{
+        const b64=await readB64(file);
+        setUploads(p=>p.map((e,j)=>j===idx?{...e,status:"analyzing"}:e));
+        const result=await analyzeDoc(b64,file.type,file.name);
+        const elapsed=((Date.now()-newEntries[i].startTime)/1000).toFixed(1);
+        setUploads(p=>p.map((e,j)=>j===idx?{...e,status:"done",result,elapsed}:e));
+      }catch(err){
+        setUploads(p=>p.map((e,j)=>j===idx?{...e,status:"error",error:err.message}:e));
+      }
+    }
+  };
+
+  // Natural language search — searches entities AND documents
+  const handleNlSearch=(q)=>{
+    setNlQuery(q);
+    setSelectedEntity(null);
+    if(q.length<2){setNlResults(null);setEntityResults(null);return;}
+    const ql=q.toLowerCase();
+    // Search entities
+    const ents=ENTITIES.filter(e=>
+      e.name.toLowerCase().includes(ql)||
+      (e.aka||[]).some(a=>a.toLowerCase().includes(ql))||
+      (e.role||"").toLowerCase().includes(ql)||
+      (e.company||"").toLowerCase().includes(ql)||
+      JSON.stringify(e.meta).toLowerCase().includes(ql)
+    );
+    setEntityResults(ents.length>0?ents:null);
+    // Search documents
+    const results=PROCESSED_DOCS.filter(d=>
+      d.name.toLowerCase().includes(ql)||d.type.toLowerCase().includes(ql)||
+      d.folder.toLowerCase().includes(ql)||
+      JSON.stringify(d.meta).toLowerCase().includes(ql)||
+      d.uploadedBy.toLowerCase().includes(ql)
+    );
+    setNlResults(results.length>0?results:null);
+  };
+
+  // Get all docs for an entity
+  const getEntityDocs=(entity)=>{
+    const nameL=entity.name.toLowerCase();
+    const aliases=(entity.aka||[]).map(a=>a.toLowerCase());
+    const allNames=[nameL,...aliases];
+    return PROCESSED_DOCS.filter(d=>{
+      const docStr=(d.name+JSON.stringify(d.meta)+d.folder+d.uploadedBy).toLowerCase();
+      return allNames.some(n=>docStr.includes(n))||entity.docs.includes(d.id);
+    });
+  };
+
+  const needsReview=PROCESSED_DOCS.filter(d=>d.status==="needs_review");
+  const needsApproval=PROCESSED_DOCS.filter(d=>d.approvalStatus==="needs_approval");
+  const allFlags=PROCESSED_DOCS.filter(d=>d.flags.length>0);
+
+  const navItems=[
+    {id:"dashboard",l:"Dashboard",ic:"📊",count:null},
+    {id:"upload",l:"Scan / Upload",ic:"📄",count:null},
+    {id:"files",l:"All Files",ic:"📁",count:PROCESSED_DOCS.length},
+    {id:"workflows",l:"Workflows",ic:"⚡",count:needsApproval.length+needsReview.length},
+    {id:"search",l:"Search",ic:"🔍",count:null},
+    {id:"audit",l:"Audit Trail",ic:"📋",count:null},
+    {id:"rules",l:"Rules Engine",ic:"🔧",count:RULES.filter(r=>r.active).length},
+    {id:"team",l:"Team & Roles",ic:"👥",count:USERS.length},
+    {id:"retention",l:"Retention",ic:"📅",count:null},
+    {id:"templates",l:"Templates",ic:"📦",count:TEMPLATES.length},
+    {id:"security",l:"Security",ic:"🔒",count:null},
+    {id:"settings",l:"Settings",ic:"⚙️",count:null},
+  ];
+
+  const css=`
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap');
+    @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    *{box-sizing:border-box;margin:0;padding:0}
+    ::selection{background:${C.acBg};color:${C.ac}}
+    ::-webkit-scrollbar{width:5px}
+    ::-webkit-scrollbar-thumb{background:${C.bd};border-radius:3px}
+    @media(max-width:768px){.sb{display:none!important}.mh{display:flex!important}.mn{padding:16px!important;margin-top:56px!important}}
+    @media(min-width:769px){.mh{display:none!important}.mo{display:none!important}}
+  `;
+
+  const SidebarNav=({mobile})=>navItems.filter(n=>sidebarVisible(n.id)).map(n=>(
+    <button key={n.id} onClick={()=>go(n.id)} style={{display:"flex",alignItems:"center",gap:mobile?10:8,width:"100%",padding:mobile?"13px 14px":"8px 14px",border:"none",cursor:"pointer",fontFamily:ft,background:nav===n.id?C.acBg:"transparent",color:nav===n.id?C.acT:C.t2,fontSize:mobile?14:12,fontWeight:nav===n.id?600:500,textAlign:"left",borderRadius:mobile?10:0,borderLeft:mobile?"none":nav===n.id?`2.5px solid ${C.ac}`:"2.5px solid transparent",marginBottom:mobile?2:0}}>
+      <span style={{fontSize:mobile?16:14,opacity:nav===n.id?1:.7}}>{n.ic}</span>
+      <span style={{flex:1}}>{n.l}</span>
+      {n.count!==null&&<span style={{fontSize:10,fontWeight:600,color:n.id==="workflows"?C.or:C.t3,background:n.id==="workflows"?C.orBg:C.inset,padding:"1px 6px",borderRadius:4}}>{n.count}</span>}
+    </button>
+  ));
+
+  const PageHeader=({title,sub})=>(
+    <div style={{marginBottom:20}}>
+      <h1 style={{fontSize:"clamp(18px,4vw,24px)",fontWeight:700,color:C.h,marginBottom:2,fontFamily:sf}}>{title}</h1>
+      <p style={{fontSize:13,color:C.t3}}>{sub}</p>
+    </div>
+  );
+
+  /* ═══ DOCUMENT DETAIL PANEL ═══ */
+  const DocDetail=({doc})=>(
+    <Card style={{padding:20,animation:"fadeUp .3s"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",flexWrap:"wrap",gap:8,marginBottom:16}}>
+        <div>
+          <div style={{fontSize:16,fontWeight:700,color:C.h,marginBottom:4}}>{doc.name}</div>
+          <div style={{fontSize:12,color:C.t3}}>📁 {doc.folder}</div>
+        </div>
+        <button onClick={()=>setSelectedDoc(null)} style={{padding:"4px 10px",borderRadius:6,border:`1px solid ${C.bd}`,background:C.sf,cursor:"pointer",fontSize:11,color:C.t2,fontFamily:ft}}>Close</button>
+      </div>
+
+      <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:16}}>
+        <Badge c={C.gn} bg={C.gnBg}>{doc.type}</Badge>
+        <Badge>{doc.conf}% confidence</Badge>
+        <Badge c={C.t2} bg={C.inset}>v: {doc.version}</Badge>
+        {doc.flags.map(f=><span key={f}>{flagBadge(f)}</span>)}
+        {doc.approvalStatus==="needs_approval"&&<Badge c={C.or} bg={C.orBg}>Awaiting Approval</Badge>}
+        <div style={{display:"flex",alignItems:"center",gap:3,fontSize:10,color:C.sh}}><Lock s={9} c={C.sh}/>Encrypted</div>
+      </div>
+
+      {/* Metadata */}
+      <div style={{padding:"14px",borderRadius:10,background:C.inset,border:`1px solid ${C.bdL}`,marginBottom:14}}>
+        <div style={{fontSize:10,color:C.t3,fontWeight:600,letterSpacing:.4,textTransform:"uppercase",marginBottom:10}}>Extracted Information</div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:6}}>
+          {Object.entries(doc.meta).map(([k,v])=>(
+            <div key={k} style={{padding:"6px 8px",borderRadius:6,background:C.sf,border:`1px solid ${C.bdL}`}}>
+              <div style={{fontSize:9,color:C.t3,textTransform:"uppercase",letterSpacing:.3,marginBottom:2}}>{k.replace(/_/g," ")}</div>
+              <div style={{fontSize:12,fontWeight:600,color:C.h,wordBreak:"break-word"}}>{v}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Version chain */}
+      <div style={{padding:"12px 14px",borderRadius:10,background:C.inset,border:`1px solid ${C.bdL}`,marginBottom:14}}>
+        <div style={{fontSize:10,color:C.t3,fontWeight:600,letterSpacing:.4,textTransform:"uppercase",marginBottom:8}}>Version History</div>
+        {doc.versions.map((v,i)=>(
+          <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:i<doc.versions.length-1?`1px solid ${C.bdL}`:"none"}}>
+            <div style={{width:8,height:8,borderRadius:4,background:v===doc.version?C.gn:C.bd}}/>
+            <span style={{fontSize:12,fontWeight:v===doc.version?600:400,color:v===doc.version?C.gn:C.t2,textTransform:"capitalize"}}>{v}</span>
+            {v===doc.version&&<span style={{fontSize:10,color:C.t3}}>(current)</span>}
+          </div>
+        ))}
+      </div>
+
+      {/* Connected Entities — people, companies, references */}
+      {(()=>{
+        const docEntities=ENTITIES.filter(e=>e.docs.includes(doc.id)||
+          (e.name&&JSON.stringify(doc.meta).toLowerCase().includes(e.name.toLowerCase()))||
+          (e.aka||[]).some(a=>JSON.stringify(doc.meta).toLowerCase().includes(a.toLowerCase()))
+        );
+        if(docEntities.length===0) return null;
+        return (
+          <div style={{padding:"12px 14px",borderRadius:10,background:C.blBg,border:`1px solid ${C.blBd}`,marginBottom:14}}>
+            <div style={{fontSize:10,color:C.t3,fontWeight:600,letterSpacing:.4,textTransform:"uppercase",marginBottom:8}}>🔗 Connected People, Companies & References</div>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+              {docEntities.map(e=>(
+                <div key={e.id} onClick={()=>{setSelectedEntity(e);setNav("search");setSelectedDoc(null)}} style={{
+                  display:"flex",alignItems:"center",gap:6,padding:"6px 10px",borderRadius:7,
+                  background:C.sf,border:`1px solid ${C.blBd}`,cursor:"pointer",transition:"all .15s",
+                }}
+                onMouseEnter={ev=>ev.currentTarget.style.background=C.hover}
+                onMouseLeave={ev=>ev.currentTarget.style.background=C.sf}
+                >
+                  <span style={{fontSize:13}}>{e.type==="person"?"👤":e.type==="company"?"🏢":e.type==="location"?"📍":"#️⃣"}</span>
+                  <div>
+                    <div style={{fontSize:11,fontWeight:600,color:C.h}}>{e.name}</div>
+                    <div style={{fontSize:9,color:C.t3}}>{e.type}{e.role?` · ${e.role}`:""} · {getEntityDocs(e).length} docs</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Linked docs */}
+      {doc.linked.length>0&&(
+        <div style={{padding:"12px 14px",borderRadius:10,background:C.blBg,border:`1px solid ${C.blBd}`,marginBottom:14}}>
+          <div style={{fontSize:10,color:C.t3,fontWeight:600,letterSpacing:.4,textTransform:"uppercase",marginBottom:8}}>🔗 Linked Documents</div>
+          {doc.linked.map(lid=>{
+            const ld=PROCESSED_DOCS.find(d=>d.id===lid);
+            return ld?<div key={lid} onClick={()=>setSelectedDoc(ld)} style={{fontSize:12,color:C.bl,fontWeight:500,cursor:"pointer",padding:"4px 0"}}>{ld.name} ({ld.type})</div>:null;
+          })}
+        </div>
+      )}
+
+      {/* Retention */}
+      {doc.retention&&(
+        <div style={{padding:"10px 14px",borderRadius:8,background:C.inset,border:`1px solid ${C.bdL}`,fontSize:12,color:C.t2}}>
+          📅 Retention: <strong style={{color:C.h}}>{doc.retention}</strong> — expires {doc.retentionExpiry}
+        </div>
+      )}
+
+      {/* Approval actions */}
+      {doc.approvalStatus==="needs_approval"&&(
+        <div style={{display:"flex",gap:8,marginTop:14}}>
+          <button style={{flex:1,padding:"10px",borderRadius:8,border:"none",background:C.gn,color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:ft}}>✓ Approve</button>
+          <button style={{flex:1,padding:"10px",borderRadius:8,border:`1px solid ${C.rd}`,background:"transparent",color:C.rd,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:ft}}>✕ Reject</button>
+        </div>
+      )}
+
+      {/* Audit for this doc */}
+      <div style={{marginTop:14}}>
+        <div style={{fontSize:10,color:C.t3,fontWeight:600,letterSpacing:.4,textTransform:"uppercase",marginBottom:8}}>Activity Log</div>
+        {AUDIT_LOG.filter(a=>a.file.includes(doc.orig)||a.file.includes(doc.name.substring(0,20))).slice(0,5).map((a,i)=>(
+          <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:`1px solid ${C.bdL}`,fontSize:11}}>
+            <span>{a.icon}</span>
+            <div style={{flex:1}}>
+              <span style={{color:C.t,fontWeight:500}}>{a.action}</span>
+              <span style={{color:C.t3,marginLeft:6}}>{a.detail}</span>
+            </div>
+            <span style={{color:C.t3,fontSize:10,flexShrink:0}}>{a.time}</span>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+
+  /* ═══ RENDER ═══ */
+  return (
+    <div style={{minHeight:"100vh",background:C.bg,fontFamily:ft,display:"flex"}}>
+      <style>{css}</style>
+
+      {/* Sidebar */}
+      <aside className="sb" style={{width:200,background:C.sf,borderRight:`1px solid ${C.bd}`,padding:"16px 0",display:"flex",flexDirection:"column",minHeight:"100vh",flexShrink:0,overflowY:"auto"}}>
+        <div style={{padding:"0 14px",marginBottom:20}}>
+          <div style={{display:"flex",alignItems:"center",gap:7}}>
+            <div style={{width:26,height:26,borderRadius:6,background:C.ac,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:700,fontSize:12}}>S</div>
+            <span style={{fontSize:16,fontWeight:700,color:C.h}}>Settle<span style={{color:C.ac}}>.</span></span>
+          </div>
+        </div>
+        <nav style={{flex:1}}><SidebarNav/></nav>
+        <div style={{padding:"0 10px"}}>
+          <button onClick={()=>setMode(m=>m==="light"?"dark":"light")} style={{display:"flex",alignItems:"center",gap:5,width:"100%",padding:"7px 10px",borderRadius:7,border:`1px solid ${C.bd}`,background:C.hover,cursor:"pointer",color:C.t2,fontSize:11,fontWeight:500,fontFamily:ft,marginBottom:6,justifyContent:"center"}}>
+            {mode==="light"?<Moon s={11} c={C.t2}/>:<Sun s={11} c={C.t2}/>}{mode==="light"?"Dark":"Light"}
+          </button>
+          <div style={{padding:"6px 8px",borderRadius:6,background:C.shBg,border:`1px solid ${C.shBd}`,display:"flex",alignItems:"center",gap:5}}>
+            <Shield s={12} c={C.gn}/><span style={{fontSize:9,fontWeight:600,color:C.gn}}>Encrypted · AES-256</span>
+          </div>
+        </div>
+      </aside>
+
+      {/* Mobile header */}
+      <div className="mh" style={{display:"none",position:"fixed",top:0,left:0,right:0,zIndex:100,height:52,padding:"0 14px",background:C.sf,borderBottom:`1px solid ${C.bd}`,alignItems:"center",justifyContent:"space-between"}}>
+        <div style={{display:"flex",alignItems:"center",gap:6}}>
+          <div style={{width:24,height:24,borderRadius:5,background:C.ac,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:700,fontSize:11}}>S</div>
+          <span style={{fontSize:14,fontWeight:700,color:C.h}}>Settle<span style={{color:C.ac}}>.</span></span>
+        </div>
+        <div style={{display:"flex",alignItems:"center",gap:5}}>
+          <Shield s={14} c={C.gn}/>
+          <button onClick={()=>setMode(m=>m==="light"?"dark":"light")} style={{padding:"4px 7px",border:`1px solid ${C.bd}`,borderRadius:5,background:C.sf,cursor:"pointer",display:"flex"}}>{mode==="light"?<Moon s={13} c={C.t2}/>:<Sun s={13} c={C.t2}/>}</button>
+          <button onClick={()=>setMenuOpen(!menuOpen)} style={{padding:4,border:`1px solid ${C.bd}`,borderRadius:5,background:C.sf,cursor:"pointer",display:"flex"}}>{menuOpen?<XI s={17} c={C.t}/>:<MI s={17} c={C.t}/>}</button>
+        </div>
+      </div>
+      {menuOpen&&<div className="mo" style={{position:"fixed",top:52,left:0,right:0,bottom:0,zIndex:99,background:C.sf,padding:10,overflowY:"auto"}}><SidebarNav mobile/></div>}
+
+      {/* Main */}
+      <main className="mn" style={{flex:1,padding:"24px 28px",overflowY:"auto",maxHeight:"100vh"}}>
+        <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.tiff,.tif,.webp" multiple style={{display:"none"}} onChange={e=>{if(e.target.files.length)processFiles(e.target.files);e.target.value=""}}/>
+
+        {/* ═══ DASHBOARD ═══ */}
+        {nav==="dashboard"&&(
+          <div style={{animation:"fadeUp .4s"}}>
+            <PageHeader title="Dashboard" sub="Real-time document operations overview"/>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:10,marginBottom:20}}>
+              {[{l:"Today",v:"31",s:"↑18%"},{l:"Month",v:"156"},{l:"Accuracy",v:"94%"},{l:"Speed",v:"3.4s"},{l:"Flagged",v:allFlags.length,s:allFlags.length>0?"Action needed":""},{l:"Pending",v:needsApproval.length+needsReview.length}].map((c,i)=>(
+                <Card key={i} style={{padding:"14px 16px"}}>
+                  <div style={{fontSize:10,color:C.t3,fontWeight:500,textTransform:"uppercase",letterSpacing:.4,marginBottom:4}}>{c.l}</div>
+                  <div style={{fontSize:22,fontWeight:700,color:C.h}}>{c.v}</div>
+                  {c.s&&<div style={{fontSize:10,color:c.l==="Flagged"?C.or:C.gn,fontWeight:500,marginTop:2}}>{c.s}</div>}
+                </Card>
+              ))}
+            </div>
+
+            {/* Alerts */}
+            {allFlags.length>0&&(
+              <Card style={{padding:"14px 16px",background:C.orBg,borderColor:C.orBd,marginBottom:16}}>
+                <div style={{fontSize:13,fontWeight:600,color:C.or,marginBottom:8}}>⚠ Action Required ({allFlags.length})</div>
+                {allFlags.map(d=>(
+                  <div key={d.id} onClick={()=>{setSelectedDoc(d);setNav("files")}} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"6px 0",cursor:"pointer",borderBottom:`1px solid ${C.orBd}`,flexWrap:"wrap",gap:4}}>
+                    <span style={{fontSize:12,color:C.t,fontWeight:500}}>{d.name}</span>
+                    <div style={{display:"flex",gap:4}}>{d.flags.map(f=><span key={f}>{flagBadge(f)}</span>)}</div>
+                  </div>
+                ))}
+              </Card>
+            )}
+
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:14}}>
+              <Card style={{padding:"16px 18px"}}>
+                <div style={{fontSize:13,fontWeight:600,color:C.h,marginBottom:12}}>Recent Activity</div>
+                {AUDIT_LOG.slice(0,6).map((a,i)=>(
+                  <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:i<5?`1px solid ${C.bdL}`:"none",fontSize:11}}>
+                    <span>{a.icon}</span>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{color:C.t,fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{a.action}</div>
+                      <div style={{color:C.t3,fontSize:10}}>{a.user} · {a.time}</div>
+                    </div>
+                  </div>
+                ))}
+              </Card>
+              <Card style={{padding:"16px 18px"}}>
+                <div style={{fontSize:13,fontWeight:600,color:C.h,marginBottom:12}}>Document Types</div>
+                {[{t:"Invoices & Receipts",c:47,p:30},{t:"Patient Records",c:31,p:20},{t:"Purchase Orders",c:22,p:14},{t:"Delivery Tickets",c:18,p:12},{t:"Contracts",c:16,p:10},{t:"Daily Reports & Tip Sheets",c:12,p:8},{t:"Compliance & Inspections",c:10,p:6}].map((item,i)=>(
+                  <div key={i} style={{marginBottom:8}}>
+                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}><span style={{fontSize:11,color:C.t}}>{item.t}</span><span style={{fontSize:10,color:C.t3}}>{item.c}</span></div>
+                    <div style={{height:4,borderRadius:2,background:C.inset,overflow:"hidden"}}><div style={{width:`${item.p}%`,height:"100%",borderRadius:2,background:C.ac}}/></div>
+                  </div>
+                ))}
+              </Card>
+            </div>
+          </div>
+        )}
+
+        {/* ═══ UPLOAD ═══ */}
+        {nav==="upload"&&(
+          <div style={{animation:"fadeUp .4s"}}>
+            <PageHeader title="Scan or Upload" sub="Drop a real document — AI identifies, names, checks for issues, and files it."/>
+            <Card onClick={()=>fileRef.current?.click()} onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();if(e.dataTransfer.files.length)processFiles(e.dataTransfer.files)}}
+              style={{padding:"clamp(24px,5vw,44px) 20px",textAlign:"center",cursor:"pointer",border:`2px dashed ${C.bd}`,transition:"all .2s"}}>
+              <div style={{fontSize:32,marginBottom:8}}>📄</div>
+              <div style={{fontSize:"clamp(14px,3vw,17px)",fontWeight:600,color:C.h,marginBottom:6}}>Drop documents here, or tap to browse</div>
+              <div style={{fontSize:12,color:C.t3,marginBottom:12}}>PDF, JPG, PNG — any document</div>
+              <div style={{display:"inline-flex",alignItems:"center",gap:4,padding:"4px 10px",borderRadius:5,background:C.shBg,border:`1px solid ${C.shBd}`,fontSize:10,fontWeight:600,color:C.sh,marginBottom:14}}><Lock s={9} c={C.sh}/>Encrypted instantly</div>
+              <div style={{display:"flex",gap:8,justifyContent:"center",flexWrap:"wrap"}}>
+                <span style={{padding:"8px 18px",borderRadius:7,background:C.ac,color:"#fff",fontSize:12,fontWeight:600}}>Choose Files</span>
+                <span style={{padding:"8px 18px",borderRadius:7,border:`1px solid ${C.bd}`,background:C.sf,color:C.t2,fontSize:12,fontWeight:600}}>📷 Camera</span>
+              </div>
+            </Card>
+
+            {uploads.length>0&&<div style={{marginTop:16}}>
+              {uploads.map((entry,i)=>{
+                const{file,status,result,error,elapsed}=entry;
+                const processing=["encrypting","reading","analyzing"].includes(status);
+                return(
+                  <Card key={i} style={{marginBottom:12,overflow:"hidden",animation:"fadeUp .3s"}}>
+                    <div style={{padding:"12px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:6,borderBottom:(result||error)?`1px solid ${C.bdL}`:"none"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                        <div style={{width:28,height:28,borderRadius:7,background:status==="done"?C.gnBg:status==="error"?C.rdBg:C.acBg,border:`1px solid ${status==="done"?C.gnBd:status==="error"?C.rdBd:C.acBd}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                          {status==="done"?<Chk s={12} c={C.gn}/>:status==="error"?<span style={{fontSize:11}}>⚠</span>:status==="encrypting"?<Lock s={11} c={C.sh}/>:<Spinner/>}
+                        </div>
+                        <div>
+                          <div style={{fontSize:12,fontWeight:500,color:status==="done"?C.t3:C.t,textDecoration:status==="done"?"line-through":"none"}}>{file.name}</div>
+                          <div style={{fontSize:10,color:C.t3}}>{(file.size/1024).toFixed(0)} KB</div>
+                        </div>
+                      </div>
+                      <div style={{display:"flex",alignItems:"center",gap:6}}>
+                        {elapsed&&<span style={{fontSize:10,color:C.t3}}>{elapsed}s</span>}
+                        <span style={{fontSize:11,fontWeight:600,color:status==="done"?C.gn:status==="error"?C.or:C.ac}}>
+                          {status==="encrypting"?"🔒 Encrypting...":status==="reading"?"📖 Reading...":status==="analyzing"?"🧠 Analyzing...":status==="done"?"✓ Identified & named":status==="error"?"⚠ Error":""}
+                        </span>
+                      </div>
+                    </div>
+                    {processing&&<div style={{height:2,background:C.inset}}><div style={{height:"100%",background:C.ac,borderRadius:2,transition:"width .5s",width:status==="encrypting"?"25%":status==="reading"?"50%":"80%"}}/></div>}
+                    {error&&<div style={{padding:"12px 16px",background:C.rdBg}}><p style={{fontSize:11,color:C.rd}}>{error}</p><button onClick={()=>processFiles([file])} style={{marginTop:6,padding:"5px 12px",borderRadius:5,border:`1px solid ${C.rdBd}`,background:"transparent",color:C.rd,fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:ft}}>Retry</button></div>}
+                    {result&&(
+                      <div style={{padding:"14px 16px",animation:"fadeIn .4s"}}>
+                        <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>
+                          <Badge c={C.gn} bg={C.gnBg}>{result.document_type}</Badge>
+                          <Badge>{result.confidence}%</Badge>
+                          {result.version_hint&&result.version_hint!=="null"&&<Badge c={C.bl} bg={C.blBg}>Version: {result.version_hint}</Badge>}
+                          {result.contains_handwriting&&<Badge c={C.bl} bg={C.blBg}>✍️ Handwriting {result.handwriting_confidence||""}</Badge>}
+                          {result.scan_quality&&result.scan_quality!=="good"&&<Badge c={C.or} bg={C.orBg}>Scan: {result.scan_quality}</Badge>}
+                          {(result.missing_info||[]).length>0&&<Badge c={C.or} bg={C.orBg}>⚠ Missing info</Badge>}
+                          <div style={{display:"flex",alignItems:"center",gap:3,fontSize:9,color:C.sh}}><Lock s={8} c={C.sh}/>Encrypted</div>
+                        </div>
+                        <p style={{fontSize:13,color:C.t,lineHeight:1.5,marginBottom:12,fontFamily:sf}}>{result.summary}</p>
+                        {(result.missing_info||[]).length>0&&(
+                          <div style={{padding:"10px 12px",borderRadius:8,background:C.orBg,border:`1px solid ${C.orBd}`,marginBottom:12}}>
+                            <div style={{fontSize:10,fontWeight:600,color:C.or,marginBottom:4}}>⚠ MISSING INFORMATION DETECTED</div>
+                            {result.missing_info.map((m,j)=><div key={j} style={{fontSize:12,color:C.or,padding:"2px 0"}}>• {m}</div>)}
+                          </div>
+                        )}
+                        <div style={{padding:"12px",borderRadius:8,background:C.gnBg,border:`1px solid ${C.gnBd}`,marginBottom:12}}>
+                          <div style={{fontSize:9,color:C.t3,fontWeight:600,textTransform:"uppercase",letterSpacing:.3,marginBottom:4}}>Suggested Filename</div>
+                          <code style={{fontSize:13,fontWeight:600,color:C.gn,wordBreak:"break-all",display:"block"}}>→ {result.suggested_filename}</code>
+                          <div style={{fontSize:11,color:C.t2,marginTop:4}}>📁 {result.suggested_folder}</div>
+                        </div>
+                        <div style={{padding:"12px",borderRadius:8,background:C.inset,border:`1px solid ${C.bdL}`}}>
+                          <div style={{fontSize:9,color:C.t3,fontWeight:600,textTransform:"uppercase",letterSpacing:.3,marginBottom:8}}>Extracted Information</div>
+                          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:6}}>
+                            {Object.entries(result.extracted_fields||{}).map(([k,v])=>(
+                              <div key={k} style={{padding:"5px 8px",borderRadius:6,background:C.sf,border:`1px solid ${C.bdL}`}}>
+                                <div style={{fontSize:9,color:C.t3,textTransform:"uppercase",letterSpacing:.3,marginBottom:1}}>{k.replace(/_/g," ")}</div>
+                                <div style={{fontSize:12,fontWeight:600,color:C.h,wordBreak:"break-word"}}>{String(v)}</div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </Card>
+                );
+              })}
+              <button onClick={()=>setUploads([])} style={{padding:"6px 14px",borderRadius:6,border:`1px solid ${C.bd}`,background:C.sf,color:C.t2,fontSize:11,cursor:"pointer",fontFamily:ft}}>Clear all</button>
+            </div>}
+          </div>
+        )}
+
+        {/* ═══ ALL FILES ═══ */}
+        {nav==="files"&&(
+          <div style={{animation:"fadeUp .4s"}}>
+            <PageHeader title="All Files" sub={`${PROCESSED_DOCS.length} documents — named, sorted, encrypted, version-tracked.`}/>
+            {selectedDoc?<DocDetail doc={selectedDoc}/>:(
+              <Card style={{overflow:"hidden"}}>
+                {PROCESSED_DOCS.map((d,i)=>(
+                  <div key={d.id} onClick={()=>setSelectedDoc(d)} style={{padding:"12px 16px",borderBottom:`1px solid ${C.bdL}`,cursor:"pointer",transition:"background .1s"}}
+                    onMouseEnter={e=>e.currentTarget.style.background=C.hover} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",gap:6,marginBottom:4,flexWrap:"wrap"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:7,minWidth:0}}>
+                        <div style={{position:"relative",flexShrink:0}}><span style={{fontSize:13}}>📄</span><div style={{position:"absolute",bottom:-2,right:-3,width:9,height:9,borderRadius:5,background:C.sf,display:"flex",alignItems:"center",justifyContent:"center",border:`1px solid ${C.shBd}`}}><Lock s={5} c={C.gn}/></div></div>
+                        <div style={{minWidth:0}}>
+                          <div style={{fontSize:12,fontWeight:500,color:C.t,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{d.name}</div>
+                          <div style={{fontSize:10,color:C.t3}}>📁 {d.folder} · {d.uploadedBy} · {d.uploadedAt}</div>
+                        </div>
+                      </div>
+                      <div style={{display:"flex",gap:4,flexWrap:"wrap",alignItems:"center"}}>
+                        <Badge c={C.gn} bg={C.gnBg}>{d.type}</Badge>
+                        {d.versions.length>1&&<Badge c={C.bl} bg={C.blBg}>v{d.versions.length}: {d.version}</Badge>}
+                        {d.linked.length>0&&<Badge c={C.bl} bg={C.blBg}>🔗 {d.linked.length}</Badge>}
+                        {d.flags.map(f=><span key={f}>{flagBadge(f)}</span>)}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </Card>
+            )}
+          </div>
+        )}
+
+        {/* ═══ WORKFLOWS ═══ */}
+        {nav==="workflows"&&(
+          <div style={{animation:"fadeUp .4s"}}>
+            <PageHeader title="Workflows" sub={`${needsApproval.length} awaiting approval · ${needsReview.length} need review`}/>
+            {needsApproval.length>0&&(<>
+              <div style={{fontSize:13,fontWeight:600,color:C.h,marginBottom:10}}>Awaiting Approval</div>
+              {needsApproval.map(d=>(
+                <Card key={d.id} style={{padding:"14px 16px",marginBottom:10}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,marginBottom:8}}>
+                    <div>
+                      <div style={{fontSize:13,fontWeight:600,color:C.h}}>{d.name}</div>
+                      <div style={{fontSize:11,color:C.t3}}>{d.type} · {d.uploadedBy} · {d.uploadedAt}</div>
+                    </div>
+                    <div style={{display:"flex",gap:4}}>{d.flags.map(f=><span key={f}>{flagBadge(f)}</span>)}</div>
+                  </div>
+                  <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:10}}>
+                    {Object.entries(d.meta).slice(0,4).map(([k,v])=><Badge key={k} c={C.t2} bg={C.inset}>{k}: {v}</Badge>)}
+                  </div>
+                  <div style={{display:"flex",gap:8}}>
+                    <button style={{flex:1,padding:"9px",borderRadius:7,border:"none",background:C.gn,color:"#fff",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:ft}}>✓ Approve & File</button>
+                    <button style={{padding:"9px 16px",borderRadius:7,border:`1px solid ${C.rd}`,background:"transparent",color:C.rd,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:ft}}>Reject</button>
+                    <button onClick={()=>setSelectedDoc(d)} style={{padding:"9px 16px",borderRadius:7,border:`1px solid ${C.bd}`,background:C.sf,color:C.t2,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:ft}}>View Details</button>
+                  </div>
+                </Card>
+              ))}
+            </>)}
+            {needsReview.length>0&&(<>
+              <div style={{fontSize:13,fontWeight:600,color:C.h,marginBottom:10,marginTop:16}}>Needs Review</div>
+              {needsReview.map(d=>(
+                <Card key={d.id} style={{padding:"14px 16px",marginBottom:10}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,marginBottom:8}}>
+                    <div>
+                      <div style={{fontSize:13,fontWeight:600,color:C.h}}>{d.name}</div>
+                      <div style={{fontSize:11,color:C.t3}}>{d.type} · {d.conf}% confidence · {d.uploadedBy}</div>
+                    </div>
+                    <div style={{display:"flex",gap:4}}>{d.flags.map(f=><span key={f}>{flagBadge(f)}</span>)}</div>
+                  </div>
+                  <div style={{display:"flex",gap:8}}>
+                    <button style={{flex:1,padding:"9px",borderRadius:7,border:"none",background:C.ac,color:"#fff",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:ft}}>Review & Correct</button>
+                    <button onClick={()=>setSelectedDoc(d)} style={{padding:"9px 16px",borderRadius:7,border:`1px solid ${C.bd}`,background:C.sf,color:C.t2,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:ft}}>View</button>
+                  </div>
+                </Card>
+              ))}
+            </>)}
+            {selectedDoc&&<div style={{marginTop:16}}><DocDetail doc={selectedDoc}/></div>}
+          </div>
+        )}
+
+        {/* ═══ SEARCH (Entity-aware) ═══ */}
+        {nav==="search"&&(
+          <div style={{animation:"fadeUp .4s"}}>
+            <PageHeader title="Search" sub="Find people, companies, documents — everything is connected."/>
+            <Card style={{padding:"4px 4px 4px 14px",display:"flex",alignItems:"center",marginBottom:16}}>
+              <span style={{fontSize:14,marginRight:6,opacity:.5}}>🔍</span>
+              <input type="text" placeholder='Search people, companies, reference numbers, document types...' value={nlQuery} onChange={e=>handleNlSearch(e.target.value)}
+                style={{flex:1,border:"none",outline:"none",fontSize:13,padding:"11px 0",color:C.t,background:"transparent",fontFamily:ft}}/>
+              {nlQuery&&<button onClick={()=>{setNlQuery("");setNlResults(null);setEntityResults(null);setSelectedEntity(null)}} style={{padding:"6px 12px",borderRadius:5,border:"none",background:C.hover,color:C.t2,fontSize:11,cursor:"pointer",marginRight:4,fontFamily:ft}}>Clear</button>}
+            </Card>
+
+            {/* Suggested searches */}
+            {!nlQuery&&!selectedEntity&&(
+              <div style={{textAlign:"center",padding:"24px 0",color:C.t3}}>
+                <div style={{fontSize:32,marginBottom:8,opacity:.4}}>🔍</div>
+                <div style={{fontSize:13,marginBottom:14}}>Search by anyone's name, any company, reference number, or document type</div>
+                <div style={{display:"flex",gap:5,justifyContent:"center",flexWrap:"wrap"}}>
+                  {["Jeamy Williams","PepsiCo","Primary Products","Jane Smith","Grainger","Sysco","PO-4505435063","INV-44892","Invoice","Contract"].map(q=>(
+                    <button key={q} onClick={()=>handleNlSearch(q)} style={{padding:"5px 10px",borderRadius:5,border:`1px solid ${C.bd}`,background:C.sf,fontSize:11,color:C.ac,cursor:"pointer",fontWeight:500,fontFamily:ft}}>{q}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Entity Detail View */}
+            {selectedEntity&&(
+              <div style={{animation:"fadeUp .3s"}}>
+                <button onClick={()=>setSelectedEntity(null)} style={{padding:"6px 12px",borderRadius:6,border:`1px solid ${C.bd}`,background:C.sf,fontSize:11,color:C.t2,cursor:"pointer",fontFamily:ft,marginBottom:12}}>← Back to results</button>
+                <Card style={{padding:20,marginBottom:14}}>
+                  <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16}}>
+                    <div style={{width:44,height:44,borderRadius:12,background:
+                      selectedEntity.type==="person"?C.acBg:
+                      selectedEntity.type==="company"?C.blBg:
+                      selectedEntity.type==="location"?"#FFF5F5":C.gnBg,
+                      display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>
+                      {selectedEntity.type==="person"?"👤":selectedEntity.type==="company"?"🏢":selectedEntity.type==="location"?"📍":"#️⃣"}
+                    </div>
+                    <div>
+                      <div style={{fontSize:18,fontWeight:700,color:C.h}}>{selectedEntity.name}</div>
+                      <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap",marginTop:4}}>
+                        <Badge c={
+                          selectedEntity.type==="person"?C.acT:
+                          selectedEntity.type==="company"?C.bl:
+                          selectedEntity.type==="location"?C.or:C.gn
+                        } bg={
+                          selectedEntity.type==="person"?C.acBg:
+                          selectedEntity.type==="company"?C.blBg:
+                          selectedEntity.type==="location"?C.orBg:C.gnBg
+                        }>{selectedEntity.type}</Badge>
+                        {selectedEntity.role&&<span style={{fontSize:12,color:C.t2}}>{selectedEntity.role}</span>}
+                        {selectedEntity.company&&<span style={{fontSize:12,color:C.t2}}>at {selectedEntity.company}</span>}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Entity metadata */}
+                  {Object.keys(selectedEntity.meta).length>0&&(
+                    <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:16}}>
+                      {Object.entries(selectedEntity.meta).map(([k,v])=>(
+                        <div key={k} style={{padding:"5px 10px",borderRadius:6,background:C.inset,border:`1px solid ${C.bdL}`}}>
+                          <div style={{fontSize:9,color:C.t3,textTransform:"uppercase",letterSpacing:.3}}>{k.replace(/_/g," ")}</div>
+                          <div style={{fontSize:12,fontWeight:600,color:C.h}}>{v}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Also known as */}
+                  {(selectedEntity.aka||[]).length>0&&(
+                    <div style={{fontSize:11,color:C.t3,marginBottom:12}}>
+                      Also appears as: {selectedEntity.aka.map((a,i)=><span key={i}><strong style={{color:C.t2}}>{a}</strong>{i<selectedEntity.aka.length-1?", ":""}</span>)}
+                    </div>
+                  )}
+                </Card>
+
+                {/* All documents for this entity */}
+                <div style={{fontSize:13,fontWeight:600,color:C.h,marginBottom:10}}>
+                  📄 All Documents ({getEntityDocs(selectedEntity).length})
+                </div>
+                <Card style={{overflow:"hidden"}}>
+                  {getEntityDocs(selectedEntity).length===0?(
+                    <div style={{padding:"20px",textAlign:"center",color:C.t3,fontSize:13}}>No documents found for this entity.</div>
+                  ):getEntityDocs(selectedEntity).map((d,i)=>(
+                    <div key={d.id} onClick={()=>{setSelectedDoc(d);setNav("files")}} style={{padding:"12px 16px",borderBottom:`1px solid ${C.bdL}`,cursor:"pointer",transition:"background .1s"}}
+                      onMouseEnter={e=>e.currentTarget.style.background=C.hover} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                      <div style={{display:"flex",justifyContent:"space-between",gap:6,marginBottom:4,flexWrap:"wrap"}}>
+                        <div style={{display:"flex",alignItems:"center",gap:7,minWidth:0}}>
+                          <span style={{fontSize:13}}>📄</span>
+                          <div style={{minWidth:0}}>
+                            <div style={{fontSize:12,fontWeight:500,color:C.t,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{d.name}</div>
+                            <div style={{fontSize:10,color:C.t3}}>📁 {d.folder} · {d.uploadedAt}</div>
+                          </div>
+                        </div>
+                        <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                          <Badge c={C.gn} bg={C.gnBg}>{d.type}</Badge>
+                          <Badge>{d.conf}%</Badge>
+                        </div>
+                      </div>
+                      <div style={{display:"flex",gap:4,flexWrap:"wrap",marginLeft:20}}>
+                        {Object.entries(d.meta).slice(0,4).map(([k,v])=>(
+                          <span key={k} style={{fontSize:10,color:C.t3}}>{k.replace(/_/g," ")}: <strong style={{color:C.t2}}>{v}</strong></span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </Card>
+
+                {/* Related entities */}
+                {(()=>{
+                  const docIds=getEntityDocs(selectedEntity).map(d=>d.id);
+                  const related=ENTITIES.filter(e=>e.id!==selectedEntity.id&&e.docs.some(did=>docIds.includes(did)));
+                  if(related.length===0) return null;
+                  return (
+                    <div style={{marginTop:16}}>
+                      <div style={{fontSize:13,fontWeight:600,color:C.h,marginBottom:10}}>🔗 Related People & Companies</div>
+                      <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                        {related.map(e=>(
+                          <Card key={e.id} onClick={()=>setSelectedEntity(e)} style={{padding:"10px 14px",cursor:"pointer",display:"flex",alignItems:"center",gap:8,minWidth:140}}>
+                            <span style={{fontSize:16}}>{e.type==="person"?"👤":e.type==="company"?"🏢":e.type==="location"?"📍":"#️⃣"}</span>
+                            <div>
+                              <div style={{fontSize:12,fontWeight:600,color:C.h}}>{e.name}</div>
+                              <div style={{fontSize:10,color:C.t3}}>{e.type} · {e.docs.length} docs</div>
+                            </div>
+                          </Card>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+
+            {/* Search Results — Entities first, then documents */}
+            {nlQuery&&!selectedEntity&&(
+              <div>
+                {/* Entity results */}
+                {entityResults&&(
+                  <div style={{marginBottom:16}}>
+                    <div style={{fontSize:12,fontWeight:600,color:C.t2,marginBottom:8,letterSpacing:.3,textTransform:"uppercase"}}>People, Companies & References ({entityResults.length})</div>
+                    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                      {entityResults.map(e=>{
+                        const docCount=getEntityDocs(e).length;
+                        return (
+                          <Card key={e.id} onClick={()=>setSelectedEntity(e)} style={{padding:"12px 16px",cursor:"pointer",flex:"1 1 auto",minWidth:200,maxWidth:320,transition:"all .15s"}}
+                            onMouseEnter={ev=>ev.currentTarget.style.boxShadow="0 4px 16px rgba(0,0,0,0.1)"} onMouseLeave={ev=>ev.currentTarget.style.boxShadow=C.cs}>
+                            <div style={{display:"flex",alignItems:"center",gap:10}}>
+                              <div style={{width:36,height:36,borderRadius:9,background:
+                                e.type==="person"?C.acBg:e.type==="company"?C.blBg:e.type==="location"?C.orBg:C.gnBg,
+                                display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>
+                                {e.type==="person"?"👤":e.type==="company"?"🏢":e.type==="location"?"📍":"#️⃣"}
+                              </div>
+                              <div style={{flex:1,minWidth:0}}>
+                                <div style={{fontSize:13,fontWeight:600,color:C.h}}>{e.name}</div>
+                                <div style={{fontSize:11,color:C.t3}}>
+                                  {e.type}{e.role?` · ${e.role}`:""}{e.company?` · ${e.company}`:""}
+                                </div>
+                              </div>
+                              <div style={{textAlign:"right",flexShrink:0}}>
+                                <div style={{fontSize:16,fontWeight:700,color:C.ac}}>{docCount}</div>
+                                <div style={{fontSize:9,color:C.t3}}>docs</div>
+                              </div>
+                            </div>
+                          </Card>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Document results */}
+                {nlResults&&(
+                  <div>
+                    <div style={{fontSize:12,fontWeight:600,color:C.t2,marginBottom:8,letterSpacing:.3,textTransform:"uppercase"}}>Documents ({nlResults.length})</div>
+                    <Card style={{overflow:"hidden"}}>
+                      {nlResults.map(d=>(
+                        <div key={d.id} onClick={()=>{setSelectedDoc(d);setNav("files")}} style={{padding:"12px 16px",borderBottom:`1px solid ${C.bdL}`,cursor:"pointer"}}
+                          onMouseEnter={e=>e.currentTarget.style.background=C.hover} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                          <div style={{display:"flex",justifyContent:"space-between",gap:6,marginBottom:4,flexWrap:"wrap"}}>
+                            <span style={{fontSize:12,fontWeight:600,color:C.t}}>📄 {d.name}</span>
+                            <div style={{display:"flex",gap:4}}><Badge c={C.gn} bg={C.gnBg}>{d.type}</Badge>{d.linked.length>0&&<Badge c={C.bl} bg={C.blBg}>🔗 {d.linked.length}</Badge>}</div>
+                          </div>
+                          <div style={{display:"flex",gap:6,flexWrap:"wrap",fontSize:11}}>
+                            {Object.entries(d.meta).slice(0,4).map(([k,v])=><span key={k} style={{color:C.t3}}>{k.replace(/_/g," ")}: <strong style={{color:C.t2}}>{v}</strong></span>)}
+                          </div>
+                        </div>
+                      ))}
+                    </Card>
+                  </div>
+                )}
+
+                {/* No results */}
+                {!entityResults&&!nlResults&&(
+                  <div style={{textAlign:"center",padding:"30px 0",color:C.t3,fontSize:13}}>No people, companies, or documents match "{nlQuery}"</div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ═══ AUDIT TRAIL ═══ */}
+        {nav==="audit"&&(
+          <div style={{animation:"fadeUp .4s"}}>
+            <PageHeader title="Audit Trail" sub="Immutable record of every action. Exportable for compliance."/>
+            <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}}>
+              <button style={{padding:"7px 14px",borderRadius:7,border:`1px solid ${C.bd}`,background:C.sf,fontSize:12,color:C.t2,cursor:"pointer",fontFamily:ft}}>📥 Export CSV</button>
+              <button style={{padding:"7px 14px",borderRadius:7,border:`1px solid ${C.bd}`,background:C.sf,fontSize:12,color:C.t2,cursor:"pointer",fontFamily:ft}}>📥 Export PDF</button>
+              <button style={{padding:"7px 14px",borderRadius:7,border:`1px solid ${C.bd}`,background:C.sf,fontSize:12,color:C.t2,cursor:"pointer",fontFamily:ft}}>🔍 Filter</button>
+            </div>
+            <Card style={{overflow:"hidden"}}>
+              <div style={{display:"flex",padding:"10px 16px",borderBottom:`1px solid ${C.bd}`,fontSize:10,fontWeight:600,color:C.t3,letterSpacing:.4,textTransform:"uppercase",gap:8}}>
+                <span style={{width:60}}>Time</span><span style={{flex:1}}>Action</span><span style={{width:100}}>User</span><span style={{flex:1}}>Details</span>
+              </div>
+              {AUDIT_LOG.map((a,i)=>(
+                <div key={i} style={{display:"flex",padding:"10px 16px",borderBottom:`1px solid ${C.bdL}`,fontSize:11,gap:8,alignItems:"center"}}>
+                  <span style={{width:60,color:C.t3,flexShrink:0}}>{a.time}</span>
+                  <span style={{flex:1,color:C.t,fontWeight:500,display:"flex",alignItems:"center",gap:4}}><span>{a.icon}</span>{a.action}</span>
+                  <span style={{width:100,color:C.t2,flexShrink:0}}>{a.user}</span>
+                  <span style={{flex:1,color:C.t3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{a.detail}</span>
+                </div>
+              ))}
+            </Card>
+          </div>
+        )}
+
+        {/* ═══ RULES ENGINE ═══ */}
+        {nav==="rules"&&(
+          <div style={{animation:"fadeUp .4s"}}>
+            <PageHeader title="Rules Engine" sub="Automate routing, approvals, and exceptions."/>
+            <button style={{padding:"9px 18px",borderRadius:8,border:"none",background:C.ac,color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:ft,marginBottom:16}}>+ Add Rule</button>
+            {RULES.map(r=>(
+              <Card key={r.id} style={{padding:"14px 16px",marginBottom:10,opacity:r.active?1:.5}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+                  <div>
+                    <div style={{fontSize:13,fontWeight:600,color:C.h,marginBottom:2}}>{r.condition}</div>
+                    <div style={{fontSize:12,color:C.ac,fontWeight:500}}>→ {r.action}</div>
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                    <Badge c={r.type==="approval"?C.or:r.type==="exception"?C.rd:C.ac} bg={r.type==="approval"?C.orBg:r.type==="exception"?C.rdBg:C.acBg}>{r.type}</Badge>
+                    <div onClick={()=>{}} style={{width:36,height:20,borderRadius:10,background:r.active?C.gn:C.bd,cursor:"pointer",position:"relative",transition:"all .2s"}}>
+                      <div style={{width:16,height:16,borderRadius:8,background:"#fff",position:"absolute",top:2,left:r.active?18:2,transition:"left .2s",boxShadow:"0 1px 3px rgba(0,0,0,.2)"}}/>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+
+        {/* ═══ TEAM & ROLES ═══ */}
+        {nav==="team"&&(
+          <div style={{animation:"fadeUp .4s"}}>
+            <PageHeader title="Team & Roles" sub="Manage who can see and do what."/>
+            <button style={{padding:"9px 18px",borderRadius:8,border:"none",background:C.ac,color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:ft,marginBottom:16}}>+ Invite Team Member</button>
+
+            {/* User Detail View */}
+            {selectedUser?(()=>{
+              const u=selectedUser;
+              const userDocs=PROCESSED_DOCS.filter(d=>u.taggedDocs.includes(d.id)||d.uploadedBy===u.name);
+              const roleColor=u.role==="Owner"?C.ac:u.role==="Manager"?C.bl:u.role==="Staff"?C.gn:C.t2;
+              const roleBg=u.role==="Owner"?C.acBg:u.role==="Manager"?C.blBg:u.role==="Staff"?C.gnBg:C.inset;
+
+              const PERM_OPTIONS = [
+                {key:"upload",label:"Upload documents"},
+                {key:"view_all",label:"View all folders"},
+                {key:"edit",label:"Edit & correct documents"},
+                {key:"delete",label:"Delete documents"},
+                {key:"approve",label:"Approve / reject flagged items"},
+                {key:"manage_users",label:"Manage team members"},
+                {key:"manage_rules",label:"Manage rules & workflows"},
+                {key:"manage_billing",label:"Manage billing & subscription"},
+                {key:"export",label:"Export data & reports"},
+                {key:"audit_view",label:"View audit trail"},
+                {key:"settings",label:"Change settings"},
+              ];
+
+              return (
+                <div style={{animation:"fadeUp .3s"}}>
+                  <button onClick={()=>setSelectedUser(null)} style={{padding:"6px 12px",borderRadius:6,border:`1px solid ${C.bd}`,background:C.sf,fontSize:11,color:C.t2,cursor:"pointer",fontFamily:ft,marginBottom:14}}>← Back to team</button>
+
+                  {/* Profile header */}
+                  <Card style={{padding:20,marginBottom:14}}>
+                    <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:16,flexWrap:"wrap"}}>
+                      <div style={{width:52,height:52,borderRadius:14,background:roleBg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,fontWeight:700,color:roleColor}}>{u.name[0]}</div>
+                      <div style={{flex:1,minWidth:160}}>
+                        <div style={{fontSize:18,fontWeight:700,color:C.h}}>{u.name}</div>
+                        <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap",marginTop:4}}>
+                          <Badge c={roleColor} bg={roleBg}>{u.role}</Badge>
+                          <span style={{fontSize:11,color:C.t3}}>Last active: {u.lastActive}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* User info grid */}
+                    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:8}}>
+                      {[
+                        {label:"User ID",value:u.id},
+                        {label:"Email",value:u.email},
+                        {label:"Phone",value:u.phone||"Not set"},
+                        {label:"Joined",value:u.joined},
+                        {label:"Documents",value:`${u.docs} uploaded`},
+                        {label:"Folder Access",value:u.folderAccess==="all"?"All folders":u.folderAccess},
+                      ].map((f,i)=>(
+                        <div key={i} style={{padding:"8px 10px",borderRadius:7,background:C.inset,border:`1px solid ${C.bdL}`}}>
+                          <div style={{fontSize:9,color:C.t3,textTransform:"uppercase",letterSpacing:.3,marginBottom:2}}>{f.label}</div>
+                          <div style={{fontSize:12,fontWeight:600,color:C.h,wordBreak:"break-word"}}>{f.value}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+
+                  {/* Access Privileges */}
+                  <Card style={{padding:20,marginBottom:14}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+                      <div>
+                        <div style={{fontSize:14,fontWeight:600,color:C.h}}>Access Privileges</div>
+                        <div style={{fontSize:11,color:C.t3}}>Control what this user can do.</div>
+                      </div>
+                      {u.role!=="Owner"&&(
+                        <div style={{display:"flex",gap:6}}>
+                          <button onClick={()=>{const upd={...u.permissions};Object.keys(upd).forEach(k=>{upd[k]=true});setSelectedUser({...u,permissions:upd})}} style={{padding:"4px 10px",borderRadius:5,border:`1px solid ${C.gnBd}`,background:C.gnBg,fontSize:10,color:C.gn,fontWeight:600,cursor:"pointer",fontFamily:ft}}>Grant all</button>
+                          <button onClick={()=>{const upd={...u.permissions};Object.keys(upd).forEach(k=>{upd[k]=false});setSelectedUser({...u,permissions:upd})}} style={{padding:"4px 10px",borderRadius:5,border:`1px solid ${C.bd}`,background:C.inset,fontSize:10,color:C.t3,fontWeight:600,cursor:"pointer",fontFamily:ft}}>Revoke all</button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Role dropdown */}
+                    <div style={{padding:"10px 14px",borderRadius:8,background:C.inset,border:`1px solid ${C.bdL}`,marginBottom:14,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+                      <div>
+                        <div style={{fontSize:11,fontWeight:600,color:C.t2}}>Role</div>
+                        <div style={{fontSize:13,fontWeight:600,color:C.h}}>{u.role}</div>
+                      </div>
+                      {u.role!=="Owner"&&(
+                        <select defaultValue={u.role} style={{padding:"7px 12px",borderRadius:7,border:`1px solid ${C.bd}`,background:C.sf,color:C.t,fontSize:12,fontFamily:ft,cursor:"pointer",outline:"none"}}>
+                          <option value="Manager">Manager</option>
+                          <option value="Staff">Staff</option>
+                          <option value="View-Only">View-Only</option>
+                        </select>
+                      )}
+                    </div>
+
+                    {/* Folder access dropdown */}
+                    <div style={{padding:"10px 14px",borderRadius:8,background:C.inset,border:`1px solid ${C.bdL}`,marginBottom:14,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+                      <div>
+                        <div style={{fontSize:11,fontWeight:600,color:C.t2}}>Folder Access Scope</div>
+                        <div style={{fontSize:12,fontWeight:500,color:C.h}}>{u.folderAccess==="all"?"All folders":u.folderAccess}</div>
+                      </div>
+                      {u.role!=="Owner"&&(
+                        <select defaultValue={u.folderAccess} style={{padding:"7px 12px",borderRadius:7,border:`1px solid ${C.bd}`,background:C.sf,color:C.t,fontSize:12,fontFamily:ft,cursor:"pointer",outline:"none"}}>
+                          <option value="all">All folders</option>
+                          <option value="Patients/">Patients/ only</option>
+                          <option value="Invoices/">Invoices/ only</option>
+                          <option value="Invoices/, PurchaseOrders/">Invoices/ & PurchaseOrders/</option>
+                          <option value="Contracts/">Contracts/ only</option>
+                          <option value="Receipts/">Receipts/ only</option>
+                          <option value="Service/">Service/ only</option>
+                          <option value="Compliance/">Compliance/ only</option>
+                          <option value="Payroll/">Payroll/ only</option>
+                        </select>
+                      )}
+                    </div>
+
+                    {/* Individual permission toggles */}
+                    {PERM_OPTIONS.map(perm=>(
+                      <div key={perm.key} style={{
+                        display:"flex",alignItems:"center",justifyContent:"space-between",
+                        padding:"9px 0",borderBottom:`1px solid ${C.bdL}`,
+                        opacity:u.permissions[perm.key]?1:0.5,transition:"opacity .2s",
+                      }}>
+                        <span style={{fontSize:12,fontWeight:500,color:C.t}}>{perm.label}</span>
+                        {u.role==="Owner"?(
+                          <Badge c={C.gn} bg={C.gnBg}>Always on</Badge>
+                        ):(
+                          <div onClick={()=>{
+                            const upd={...u.permissions,[perm.key]:!u.permissions[perm.key]};
+                            setSelectedUser({...u,permissions:upd});
+                          }} style={{
+                            width:36,height:20,borderRadius:10,
+                            background:u.permissions[perm.key]?C.gn:C.bd,
+                            cursor:"pointer",position:"relative",transition:"background .2s",flexShrink:0,
+                          }}>
+                            <div style={{
+                              width:16,height:16,borderRadius:8,background:"#fff",
+                              position:"absolute",top:2,left:u.permissions[perm.key]?18:2,
+                              transition:"left .2s",boxShadow:"0 1px 3px rgba(0,0,0,.2)",
+                            }}/>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </Card>
+
+                  {/* Documents this user is tagged on / uploaded */}
+                  <Card style={{padding:20,marginBottom:14}}>
+                    <div style={{fontSize:14,fontWeight:600,color:C.h,marginBottom:4}}>Documents ({userDocs.length})</div>
+                    <div style={{fontSize:11,color:C.t3,marginBottom:12}}>Everything this user has uploaded or is tagged on.</div>
+                    {userDocs.length===0?(
+                      <div style={{padding:"16px 0",textAlign:"center",fontSize:12,color:C.t3}}>No documents for this user.</div>
+                    ):userDocs.map((d,i)=>(
+                      <div key={d.id} onClick={()=>{setSelectedDoc(d);setNav("files");setSelectedUser(null)}} style={{
+                        display:"flex",alignItems:"center",justifyContent:"space-between",
+                        padding:"8px 0",borderBottom:i<userDocs.length-1?`1px solid ${C.bdL}`:"none",
+                        cursor:"pointer",flexWrap:"wrap",gap:4,
+                      }}>
+                        <div style={{display:"flex",alignItems:"center",gap:7,minWidth:0}}>
+                          <span style={{fontSize:12}}>📄</span>
+                          <div style={{minWidth:0}}>
+                            <div style={{fontSize:11,fontWeight:500,color:C.t,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{d.name}</div>
+                            <div style={{fontSize:10,color:C.t3}}>{d.uploadedBy===u.name?"Uploaded":"Tagged"} · {d.uploadedAt}</div>
+                          </div>
+                        </div>
+                        <div style={{display:"flex",gap:4}}>
+                          <Badge c={C.gn} bg={C.gnBg}>{d.type}</Badge>
+                          {d.flags.length>0&&d.flags.map(f=><span key={f}>{flagBadge(f)}</span>)}
+                        </div>
+                      </div>
+                    ))}
+                  </Card>
+
+                  {/* Recent activity */}
+                  <Card style={{padding:20,marginBottom:14}}>
+                    <div style={{fontSize:14,fontWeight:600,color:C.h,marginBottom:12}}>Recent Activity</div>
+                    {u.recentActivity.map((a,i)=>(
+                      <div key={i} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 0",borderBottom:i<u.recentActivity.length-1?`1px solid ${C.bdL}`:"none"}}>
+                        <div>
+                          <div style={{fontSize:12,fontWeight:500,color:C.t}}>{a.action}</div>
+                          <div style={{fontSize:10,color:C.t3}}>{a.file}</div>
+                        </div>
+                        <span style={{fontSize:10,color:C.t3,flexShrink:0}}>{a.time}</span>
+                      </div>
+                    ))}
+                  </Card>
+
+                  {/* Danger zone */}
+                  {u.role!=="Owner"&&(
+                    <Card style={{padding:"14px 18px",borderColor:C.rdBd}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+                        <div>
+                          <div style={{fontSize:13,fontWeight:600,color:C.rd}}>Remove User</div>
+                          <div style={{fontSize:11,color:C.t3}}>Revoke all access. Documents they uploaded remain.</div>
+                        </div>
+                        <button style={{padding:"7px 14px",borderRadius:7,border:`1px solid ${C.rd}`,background:"transparent",color:C.rd,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:ft}}>Remove</button>
+                      </div>
+                    </Card>
+                  )}
+                </div>
+              );
+            })():(
+              /* User list */
+              <Card style={{overflow:"hidden"}}>
+                {USERS.map((u,i)=>{
+                  const roleColor=u.role==="Owner"?C.ac:u.role==="Manager"?C.bl:u.role==="Staff"?C.gn:C.t2;
+                  const roleBg=u.role==="Owner"?C.acBg:u.role==="Manager"?C.blBg:u.role==="Staff"?C.gnBg:C.inset;
+                  return (
+                    <div key={i} onClick={()=>setSelectedUser(u)} style={{
+                      padding:"14px 16px",borderBottom:i<USERS.length-1?`1px solid ${C.bdL}`:"none",
+                      display:"flex",justifyContent:"space-between",alignItems:"center",
+                      flexWrap:"wrap",gap:8,cursor:"pointer",transition:"background .1s",
+                    }}
+                    onMouseEnter={e=>e.currentTarget.style.background=C.hover}
+                    onMouseLeave={e=>e.currentTarget.style.background="transparent"}
+                    >
+                      <div style={{display:"flex",alignItems:"center",gap:10}}>
+                        <div style={{width:36,height:36,borderRadius:9,background:roleBg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,fontWeight:700,color:roleColor}}>{u.name[0]}</div>
+                        <div>
+                          <div style={{fontSize:13,fontWeight:600,color:C.h}}>{u.name}</div>
+                          <div style={{fontSize:11,color:C.t3}}>{u.email} · {u.id}</div>
+                        </div>
+                      </div>
+                      <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                        <Badge c={roleColor} bg={roleBg}>{u.role}</Badge>
+                        <span style={{fontSize:10,color:C.t3}}>{u.access}</span>
+                        <span style={{fontSize:10,color:C.t3}}>{u.docs} docs</span>
+                        <span style={{fontSize:10,color:C.t3}}>{u.lastActive}</span>
+                        <span style={{fontSize:16,color:C.t3}}>→</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </Card>
+            )}
+          </div>
+        )}
+
+        {/* ═══ RETENTION ═══ */}
+        {nav==="retention"&&(
+          <div style={{animation:"fadeUp .4s"}}>
+            <PageHeader title="Retention & Archival" sub="Compliance-ready document lifecycle management."/>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:12,marginBottom:16}}>
+              {[{type:"Invoices & Receipts",period:"7 years",count:47,action:"Archive after 12 months"},{type:"Patient Records",period:"10 years",count:31,action:"Flag for review before deletion"},{type:"Contracts",period:"10 years",count:16,action:"Alert 90 days before expiry"},{type:"HR Documents",period:"7 years",count:8,action:"Delete after retention + 30 day grace"},{type:"Health Inspections",period:"Permanent",count:4,action:"Never delete — compliance critical"},{type:"Tip Reports & Payroll",period:"4 years",count:12,action:"IRS requirement — auto-archive"},{type:"Delivery Tickets",period:"3 years",count:22,action:"Match to vendor invoices"},{type:"Food Safety Logs",period:"5 years",count:18,action:"Health dept requirement"}].map((r,i)=>(
+                <Card key={i} style={{padding:"16px"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                    <span style={{fontSize:13,fontWeight:600,color:C.h}}>{r.type}</span>
+                    <Badge c={C.gn} bg={C.gnBg}>{r.count} docs</Badge>
+                  </div>
+                  <div style={{fontSize:12,color:C.t2,marginBottom:4}}>📅 Retain for: <strong style={{color:C.h}}>{r.period}</strong></div>
+                  <div style={{fontSize:11,color:C.t3}}>→ {r.action}</div>
+                </Card>
+              ))}
+            </div>
+            <Card style={{padding:16}}>
+              <div style={{fontSize:13,fontWeight:600,color:C.h,marginBottom:8}}>Legal Hold</div>
+              <p style={{fontSize:12,color:C.t2,marginBottom:10}}>Documents under legal hold are frozen from deletion regardless of retention rules.</p>
+              <button style={{padding:"8px 16px",borderRadius:7,border:`1px solid ${C.bd}`,background:C.sf,fontSize:12,color:C.t2,cursor:"pointer",fontFamily:ft}}>+ Place Legal Hold</button>
+            </Card>
+          </div>
+        )}
+
+        {/* ═══ TEMPLATES ═══ */}
+        {nav==="templates"&&(
+          <div style={{animation:"fadeUp .4s"}}>
+            <PageHeader title="Templates & Playbooks" sub="Pre-built setups for fast onboarding."/>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:12}}>
+              {TEMPLATES.map((t,i)=>(
+                <Card key={i} style={{padding:"18px",cursor:"pointer"}} onMouseEnter={e=>e.currentTarget.style.boxShadow=C.cs.replace("0.03","0.08")} onMouseLeave={e=>e.currentTarget.style.boxShadow=C.cs}>
+                  <div style={{fontSize:15,fontWeight:600,color:C.h,marginBottom:4}}>{t.name}</div>
+                  <div style={{fontSize:12,color:C.t2,lineHeight:1.5,marginBottom:10}}>{t.desc}</div>
+                  <div style={{display:"flex",gap:6}}>
+                    <Badge>{t.types} doc types</Badge>
+                    <Badge c={C.bl} bg={C.blBg}>{t.rules} rules</Badge>
+                  </div>
+                  <button style={{marginTop:12,width:"100%",padding:"8px",borderRadius:7,border:`1px solid ${C.ac}`,background:"transparent",color:C.ac,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:ft}}>Apply Template</button>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ═══ SECURITY ═══ */}
+        {nav==="security"&&(
+          <div style={{animation:"fadeUp .4s"}}>
+            <PageHeader title="Security" sub="How we protect every document."/>
+            <Card style={{padding:18,background:C.gnBg,borderColor:C.gnBd,marginBottom:16,display:"flex",alignItems:"center",gap:14}}>
+              <Shield s={26} c={C.gn}/><div><div style={{fontSize:16,fontWeight:700,color:C.h,fontFamily:sf}}>All systems secure</div><div style={{fontSize:12,color:C.t2}}>Every document encrypted at every step.</div></div>
+            </Card>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:10,marginBottom:16}}>
+              {[{t:"In Transit",s:"TLS 1.3",i:"🔒"},{t:"At Rest",s:"AES-256",i:"🛡️"},{t:"Metadata",s:"Encrypted",i:"🔐"},{t:"Access",s:"Role-Based",i:"👤"}].map((x,i)=>(
+                <Card key={i} style={{padding:16}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}><span style={{fontSize:16}}>{x.i}</span><Badge c={C.gn} bg={C.gnBg}>✓ {x.s}</Badge></div><div style={{fontSize:13,fontWeight:600,color:C.h}}>{x.t}</div></Card>
+              ))}
+            </div>
+            <Card style={{padding:16}}>
+              <div style={{fontSize:13,fontWeight:600,color:C.h,marginBottom:10}}>Compliance</div>
+              <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                {[{n:"HIPAA",r:true},{n:"SOC 2",r:true},{n:"FTC Safeguards",r:true},{n:"GDPR",r:true},{n:"StateRAMP",r:false},{n:"FedRAMP",r:false}].map((c,i)=>(
+                  <div key={i} style={{padding:"6px 12px",borderRadius:6,background:c.r?C.gnBg:C.inset,border:`1px solid ${c.r?C.gnBd:C.bd}`,textAlign:"center"}}>
+                    <div style={{fontSize:12,fontWeight:700,color:c.r?C.gn:C.t3}}>{c.n}</div>
+                    <div style={{fontSize:9,color:c.r?C.gn:C.t3}}>{c.r?"✓ Ready":"Soon"}</div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </div>
+        )}
+
+        {/* ═══ SETTINGS ═══ */}
+        {nav==="settings"&&(
+          <div style={{animation:"fadeUp .4s"}}>
+            <PageHeader title="Settings" sub="Configure your product. Toggle features on and off."/>
+
+            {/* Appearance */}
+            <Card style={{padding:18,marginBottom:12}}>
+              <div style={{fontSize:13,fontWeight:600,color:C.h,marginBottom:10}}>Appearance</div>
+              <div style={{display:"flex",gap:8}}>
+                {["light","dark"].map(m=>(
+                  <button key={m} onClick={()=>setMode(m)} style={{flex:1,padding:10,borderRadius:7,cursor:"pointer",fontFamily:ft,border:`2px solid ${mode===m?C.ac:C.bd}`,background:mode===m?C.acBg:C.sf,display:"flex",alignItems:"center",justifyContent:"center",gap:6,fontSize:12,fontWeight:600,color:mode===m?C.acT:C.t2}}>
+                    {m==="light"?<Sun s={13} c={mode===m?C.acT:C.t2}/>:<Moon s={13} c={mode===m?C.acT:C.t2}/>}{m==="light"?"Light":"Dark"}
+                  </button>
+                ))}
+              </div>
+            </Card>
+
+            {/* Quick Presets */}
+            <Card style={{padding:18,marginBottom:12}}>
+              <div style={{fontSize:13,fontWeight:600,color:C.h,marginBottom:4}}>Quick Setup</div>
+              <p style={{fontSize:11,color:C.t3,marginBottom:12}}>Pick your industry to auto-configure the right features. You can fine-tune everything below.</p>
+              <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                {[
+                  {id:"medical",label:"🩺 Medical / Dental",desc:"Patient records, labs, insurance, HIPAA"},
+                  {id:"restaurant",label:"🍽️ Restaurant / Hospitality",desc:"Receipts, tips, inspections, food safety"},
+                  {id:"dealership",label:"🚗 Auto Dealership",desc:"Titles, ROs, deal jackets, FTC compliance"},
+                  {id:"legal",label:"⚖️ Law Firm",desc:"Case files, court orders, retention"},
+                  {id:"government",label:"🏛️ Government",desc:"Permits, inspections, compliance"},
+                  {id:"all",label:"✨ Everything On",desc:"Enable all features"},
+                ].map(p=>(
+                  <button key={p.id} onClick={()=>applyPreset(p.id)} style={{
+                    padding:"10px 14px",borderRadius:8,cursor:"pointer",fontFamily:ft,
+                    border:`1px solid ${C.bd}`,background:C.sf,textAlign:"left",
+                    transition:"all .15s",flex:"1 1 auto",minWidth:160,
+                  }}
+                  onMouseEnter={e=>{e.currentTarget.style.borderColor=C.ac;e.currentTarget.style.background=C.acBg}}
+                  onMouseLeave={e=>{e.currentTarget.style.borderColor=C.bd;e.currentTarget.style.background=C.sf}}
+                  >
+                    <div style={{fontSize:13,fontWeight:600,color:C.h}}>{p.label}</div>
+                    <div style={{fontSize:10,color:C.t3,marginTop:2}}>{p.desc}</div>
+                  </button>
+                ))}
+              </div>
+            </Card>
+
+            {/* Feature Toggles — grouped */}
+            {FEATURE_GROUPS.map(group=>(
+              <Card key={group.id} style={{padding:18,marginBottom:12}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"start",marginBottom:4}}>
+                  <div>
+                    <div style={{fontSize:13,fontWeight:600,color:C.h}}>{group.label}</div>
+                    <div style={{fontSize:11,color:C.t3}}>{group.desc}</div>
+                  </div>
+                  {!group.locked && (
+                    <div style={{display:"flex",gap:6}}>
+                      <button onClick={()=>{const upd={...features};group.items.forEach(i=>{upd[i.key]=true});setFeatures(upd)}} style={{padding:"3px 8px",borderRadius:4,border:`1px solid ${C.gnBd}`,background:C.gnBg,fontSize:10,color:C.gn,fontWeight:600,cursor:"pointer",fontFamily:ft}}>All on</button>
+                      <button onClick={()=>{const upd={...features};group.items.forEach(i=>{upd[i.key]=false});setFeatures(upd)}} style={{padding:"3px 8px",borderRadius:4,border:`1px solid ${C.bd}`,background:C.inset,fontSize:10,color:C.t3,fontWeight:600,cursor:"pointer",fontFamily:ft}}>All off</button>
+                    </div>
+                  )}
+                </div>
+                <div style={{marginTop:12}}>
+                  {group.items.map(item=>(
+                    <div key={item.key} style={{
+                      display:"flex",alignItems:"center",justifyContent:"space-between",
+                      padding:"8px 0",borderBottom:`1px solid ${C.bdL}`,
+                      opacity:group.locked?0.7:features[item.key]?1:0.45,
+                      transition:"opacity .2s",
+                    }}>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:12,fontWeight:500,color:C.t}}>{item.label}</div>
+                        {item.desc&&<div style={{fontSize:10,color:C.t3}}>{item.desc}</div>}
+                      </div>
+                      {group.locked ? (
+                        <Badge c={C.gn} bg={C.gnBg}>Always on</Badge>
+                      ) : (
+                        <div onClick={()=>toggleFeature(item.key)} style={{
+                          width:36,height:20,borderRadius:10,
+                          background:features[item.key]?C.gn:C.bd,
+                          cursor:"pointer",position:"relative",transition:"background .2s",
+                          flexShrink:0,marginLeft:12,
+                        }}>
+                          <div style={{
+                            width:16,height:16,borderRadius:8,background:"#fff",
+                            position:"absolute",top:2,
+                            left:features[item.key]?18:2,
+                            transition:"left .2s",
+                            boxShadow:"0 1px 3px rgba(0,0,0,.2)",
+                          }}/>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            ))}
+
+            {/* Active feature count */}
+            <Card style={{padding:"14px 18px",background:C.acBg,borderColor:C.acBd}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div>
+                  <div style={{fontSize:13,fontWeight:600,color:C.h}}>
+                    {Object.values(features).filter(v=>v).length} of {Object.keys(features).length} features active
+                  </div>
+                  <div style={{fontSize:11,color:C.t2}}>
+                    {navItems.filter(n=>sidebarVisible(n.id)).length} sidebar sections visible
+                  </div>
+                </div>
+                <button onClick={()=>applyPreset("all")} style={{padding:"7px 14px",borderRadius:7,border:`1px solid ${C.ac}`,background:"transparent",color:C.ac,fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:ft}}>Enable all</button>
+              </div>
+            </Card>
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}
+
+
+ReactDOM.render(React.createElement(App), document.getElementById('root'));
+</script>
+</body>
+</html>
